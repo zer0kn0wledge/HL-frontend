@@ -81,7 +81,7 @@ function MarketRow({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-sm">{market.coin}</span>
+          <span className="font-medium text-sm">{market.name || market.coin}</span>
           <span className="text-xs text-muted-foreground uppercase">
             {market.type}
           </span>

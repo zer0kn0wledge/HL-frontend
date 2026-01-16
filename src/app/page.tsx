@@ -8,23 +8,51 @@ import { Positions } from "@/components/trading/positions";
 import { OpenOrders } from "@/components/trading/open-orders";
 import { RecentTrades } from "@/components/trading/recent-trades";
 import { BuilderApprovalModal } from "@/components/trading/builder-approval-modal";
+import { Chart } from "@/components/trading/chart";
+import { CommandPalette, useKeyboardShortcuts } from "@/components/ui/command-palette";
+import { XPBarCompact } from "@/components/gamification/xp-bar";
 import { useAppStore } from "@/store";
+import Link from "next/link";
+import {
+  Trophy,
+  Users,
+  BarChart3,
+  Flame,
+  MessageSquare,
+} from "lucide-react";
 
 // ============================================
-// Chart Placeholder
+// Navigation Sidebar
 // ============================================
 
-function ChartPlaceholder() {
+function NavSidebar() {
   return (
-    <div className="flex flex-1 items-center justify-center bg-card rounded-lg border border-border">
-      <div className="text-center">
-        <div className="mb-2 text-4xl opacity-50">📈</div>
-        <p className="text-sm text-muted-foreground">
-          TradingView Lightweight Charts
-        </p>
-        <p className="text-xs text-muted-foreground/70 mt-1">Coming soon</p>
+    <div className="hidden lg:flex flex-col w-12 bg-card border-r border-border py-2 gap-1">
+      <NavItem href="/feed" icon={<MessageSquare className="h-5 w-5" />} label="Feed" />
+      <NavItem href="/achievements" icon={<Trophy className="h-5 w-5" />} label="Achievements" />
+      <NavItem href="/challenges" icon={<Flame className="h-5 w-5" />} label="Challenges" />
+      <div className="flex-1" />
+      <div className="px-2">
+        <XPBarCompact />
       </div>
     </div>
+  );
+}
+
+function NavItem({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-center p-2 mx-1 rounded-lg hover:bg-muted transition-colors group relative"
+      title={label}
+    >
+      <span className="text-muted-foreground group-hover:text-foreground transition-colors">
+        {icon}
+      </span>
+      <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+        {label}
+      </span>
+    </Link>
   );
 }
 
@@ -77,50 +105,58 @@ function BottomPanel() {
 export default function TradingPage() {
   const { isInitializing } = useAppStore();
 
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts();
+
   return (
     <div className="flex h-screen flex-col bg-background">
       {/* Header */}
       <Header />
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden p-2 gap-2">
-        {/* Left Panel - Orderbook */}
-        <div className="hidden lg:flex w-72 flex-shrink-0">
-          <Orderbook />
-        </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Nav Sidebar */}
+        <NavSidebar />
 
-        {/* Center Content */}
-        <div className="flex flex-1 flex-col gap-2 min-w-0">
-          {/* Top Row - Chart */}
-          <div className="flex flex-1 gap-2 min-h-0">
-            {/* Chart Area */}
-            <ChartPlaceholder />
-
-            {/* Right - Trade Panel */}
-            <div className="hidden md:block w-72 flex-shrink-0">
-              <TradePanel />
-            </div>
-          </div>
-
-          {/* Mobile Orderbook */}
-          <div className="h-64 lg:hidden">
+        <div className="flex flex-1 overflow-hidden p-2 gap-2">
+          {/* Left Panel - Orderbook */}
+          <div className="hidden lg:flex w-72 flex-shrink-0">
             <Orderbook />
           </div>
 
-          {/* Mobile Trade Panel */}
-          <div className="md:hidden">
-            <TradePanel />
+          {/* Center Content */}
+          <div className="flex flex-1 flex-col gap-2 min-w-0">
+            {/* Top Row - Chart */}
+            <div className="flex flex-1 gap-2 min-h-0">
+              {/* Chart Area */}
+              <Chart className="flex-1" />
+
+              {/* Right - Trade Panel */}
+              <div className="hidden md:block w-72 flex-shrink-0">
+                <TradePanel />
+              </div>
+            </div>
+
+            {/* Mobile Orderbook */}
+            <div className="h-64 lg:hidden">
+              <Orderbook />
+            </div>
+
+            {/* Mobile Trade Panel */}
+            <div className="md:hidden">
+              <TradePanel />
+            </div>
+
+            {/* Bottom Panel - Positions/Orders/History */}
+            <div className="h-64 flex-shrink-0 hidden sm:block">
+              <BottomPanel />
+            </div>
           </div>
 
-          {/* Bottom Panel - Positions/Orders/History */}
-          <div className="h-64 flex-shrink-0 hidden sm:block">
-            <BottomPanel />
+          {/* Right Panel - Recent Trades */}
+          <div className="hidden xl:flex w-64 flex-shrink-0">
+            <RecentTrades />
           </div>
-        </div>
-
-        {/* Right Panel - Recent Trades */}
-        <div className="hidden xl:flex w-64 flex-shrink-0">
-          <RecentTrades />
         </div>
       </div>
 
@@ -128,6 +164,9 @@ export default function TradingPage() {
       <div className="sm:hidden border-t border-border">
         <BottomPanel />
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette />
 
       {/* Modals */}
       <BuilderApprovalModal />
