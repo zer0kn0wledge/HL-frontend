@@ -6,7 +6,7 @@ buildCommand = "npm run build && cp -r public .next/standalone/ && cp -r .next/s
 nixPkgs = ["nodejs_20"]
 
 [deploy]
-startCommand = "node .next/standalone/server.js"
+startCommand = "HOSTNAME=0.0.0.0 node .next/standalone/server.js"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
