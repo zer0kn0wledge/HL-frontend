@@ -30,10 +30,11 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className="dark">
-      <body className="bg-background font-sans text-white antialiased">
-        {/* Animated Background */}
+      <body className="bg-black font-sans text-white antialiased">
+        {/* Elite Animated Background */}
         <div className="animated-bg" />
         <div className="grid-overlay" />
+        <div className="noise-overlay" />
         <Providers initialState={initialState}>{children}</Providers>
       </body>
     </html>
