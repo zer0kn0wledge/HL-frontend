@@ -1,12 +1,12 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/"
+buildCommand = "npm run build"
 
 [build.nixpacksPlan.phases.setup]
 nixPkgs = ["nodejs_20"]
 
 [deploy]
-startCommand = "HOSTNAME=0.0.0.0 node .next/standalone/server.js"
+startCommand = "npm run start"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
