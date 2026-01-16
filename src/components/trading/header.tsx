@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/tooltip";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import { MarketSelectorButton } from "./market-selector";
+import { HypurrLogoCompact } from "@/components/brand/hypurr-logo";
 import { useAppStore, useMarketStore, useUserStore } from "@/store";
 import { cn } from "@/lib/utils";
 import BigNumber from "bignumber.js";
-import { BUILDER_CONFIG } from "@/lib/constants";
 
 // ============================================
 // Market Stats Bar
@@ -152,7 +152,7 @@ export function Header() {
   const { setMobileMenuOpen, setSettingsOpen } = useAppStore();
 
   return (
-    <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-card">
+    <header className="flex items-center justify-between h-14 px-4 border-b border-white/5 glass">
       {/* Left Section */}
       <div className="flex items-center gap-4">
         {/* Mobile Menu Button */}
@@ -166,21 +166,9 @@ export function Header() {
         </Button>
 
         {/* Logo */}
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
-            <span className="text-lg">🐱</span>
-          </div>
-          <div className="hidden sm:block">
-            <div className="text-sm font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-              {BUILDER_CONFIG.name}
-            </div>
-            <div className="text-[10px] text-muted-foreground">
-              DeFi Trading Terminal
-            </div>
-          </div>
-        </div>
+        <HypurrLogoCompact />
 
-        <Separator orientation="vertical" className="h-6 hidden md:block" />
+        <Separator orientation="vertical" className="h-6 hidden md:block opacity-20" />
 
         {/* Market Selector */}
         <MarketSelectorButton />

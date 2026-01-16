@@ -12,12 +12,11 @@ import { Chart } from "@/components/trading/chart";
 import { CommandPalette, useKeyboardShortcuts } from "@/components/ui/command-palette";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { XPBarCompact } from "@/components/gamification/xp-bar";
+import { HypurrLoader } from "@/components/brand/hypurr-logo";
 import { useAppStore } from "@/store";
 import Link from "next/link";
 import {
   Trophy,
-  Users,
-  BarChart3,
   Flame,
   MessageSquare,
 } from "lucide-react";
@@ -28,8 +27,8 @@ import {
 
 function NavSidebar() {
   return (
-    <div className="hidden lg:flex flex-col w-12 glass border-r border-border py-2 gap-1">
-      <NavItem href="/feed" icon={<MessageSquare className="h-5 w-5" />} label="Feed" />
+    <div className="hidden lg:flex flex-col w-14 glass border-r border-white/5 py-3 gap-1">
+      <NavItem href="/feed" icon={<MessageSquare className="h-5 w-5" />} label="Social Feed" />
       <NavItem href="/achievements" icon={<Trophy className="h-5 w-5" />} label="Achievements" />
       <NavItem href="/challenges" icon={<Flame className="h-5 w-5" />} label="Challenges" />
       <div className="flex-1" />
@@ -44,13 +43,13 @@ function NavItem({ href, icon, label }: { href: string; icon: React.ReactNode; l
   return (
     <Link
       href={href}
-      className="flex items-center justify-center p-2 mx-1 rounded-lg hover:bg-accent hover:neon-glow transition-all duration-200 group relative"
+      className="flex items-center justify-center p-2.5 mx-1.5 rounded-xl hover:bg-[#50E3C2]/10 hover:neon-glow transition-all duration-300 group relative"
       title={label}
     >
-      <span className="text-muted-foreground group-hover:text-primary transition-colors">
+      <span className="text-gray-500 group-hover:text-[#50E3C2] transition-colors">
         {icon}
       </span>
-      <span className="absolute left-full ml-2 px-2 py-1 glass text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none neon-border">
+      <span className="absolute left-full ml-3 px-3 py-1.5 glass text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none neon-border shadow-xl">
         {label}
       </span>
     </Link>
@@ -64,15 +63,15 @@ function NavItem({ href, icon, label }: { href: string; icon: React.ReactNode; l
 function BottomPanel() {
   return (
     <Tabs defaultValue="positions" className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card/50">
-        <TabsList className="h-8">
-          <TabsTrigger value="positions" className="text-xs h-7 px-3">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 glass">
+        <TabsList className="h-8 bg-black/30">
+          <TabsTrigger value="positions" className="text-xs h-7 px-3 data-[state=active]:bg-[#50E3C2]/10 data-[state=active]:text-[#50E3C2]">
             Positions
           </TabsTrigger>
-          <TabsTrigger value="orders" className="text-xs h-7 px-3">
+          <TabsTrigger value="orders" className="text-xs h-7 px-3 data-[state=active]:bg-[#50E3C2]/10 data-[state=active]:text-[#50E3C2]">
             Open Orders
           </TabsTrigger>
-          <TabsTrigger value="trades" className="text-xs h-7 px-3">
+          <TabsTrigger value="trades" className="text-xs h-7 px-3 data-[state=active]:bg-[#50E3C2]/10 data-[state=active]:text-[#50E3C2]">
             Trade History
           </TabsTrigger>
         </TabsList>
@@ -85,12 +84,12 @@ function BottomPanel() {
           <OpenOrders />
         </TabsContent>
         <TabsContent value="trades" className="h-full m-0">
-          <div className="flex flex-col h-full bg-card rounded-lg border border-border">
-            <div className="px-3 py-2 border-b border-border">
-              <h3 className="text-sm font-medium">Trade History</h3>
+          <div className="flex flex-col h-full card-elite rounded-xl">
+            <div className="px-3 py-2 border-b border-white/5">
+              <h3 className="text-sm font-medium text-white">Trade History</h3>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">No trade history</p>
+              <p className="text-sm text-gray-500">No trade history</p>
             </div>
           </div>
         </TabsContent>
@@ -175,13 +174,8 @@ export default function TradingPage() {
 
       {/* Loading Overlay */}
       {isInitializing && (
-        <div className="absolute inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center animate-neon-pulse">
-              <span className="text-2xl">🐱</span>
-            </div>
-            <p className="text-sm gradient-text font-medium">Loading Zero's Hypurr Terminal...</p>
-          </div>
+        <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50">
+          <HypurrLoader text="Loading Zero's Hypurr Terminal..." />
         </div>
       )}
     </div>
