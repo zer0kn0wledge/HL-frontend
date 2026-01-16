@@ -454,14 +454,26 @@ export async function fetchPerpMarkets(): Promise<Market[]> {
 export async function fetchSpotMarkets(): Promise<Market[]> {
   try {
     const [spotMeta, assetCtxs] = await getSpotMetaAndAssetCtxs();
+    const spotTokens = (spotMeta as any).tokens || [];
 
     return (spotMeta as any).universe.map((asset: any, index: number) => {
       const ctx = (assetCtxs as any[])[index];
       const tokens = asset.tokens;
+
+      // Create display name from token pair
+      let displayName = asset.name;
+      if (tokens && tokens.length >= 2) {
+        const baseToken = spotTokens[tokens[0].index];
+        const quoteToken = spotTokens[tokens[1].index];
+        if (baseToken?.name && quoteToken?.name) {
+          displayName = `${baseToken.name}/${quoteToken.name}`;
+        }
+      }
+
       return {
         type: "spot" as MarketType,
         coin: asset.name,
-        name: asset.name,
+        name: displayName,
         szDecimals: tokens[0]?.szDecimals || 8,
         pxDecimals: calculatePriceDecimals(ctx?.midPx || "0"),
         minSz: new BigNumber(1).shiftedBy(-(tokens[0]?.szDecimals || 8)).toString(),
@@ -469,6 +481,7 @@ export async function fetchSpotMarkets(): Promise<Market[]> {
         spotMeta: {
           tokens,
           name: asset.name,
+          displayName,
           index,
           isCanonical: asset.isCanonical || true,
         },
