@@ -1,0 +1,300 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   HyperTerminal - Professional Trading Theme
+   ============================================ */
+
+@theme inline {
+  /* shadcn/ui color mappings */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Trading colors */
+  --color-long: var(--long);
+  --color-long-foreground: var(--long-foreground);
+  --color-short: var(--short);
+  --color-short-foreground: var(--short-foreground);
+
+  /* Chart colors */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ============================================
+   Dark Theme (Default for Trading)
+   ============================================ */
+:root {
+  --radius: 0.5rem;
+
+  /* Background hierarchy */
+  --background: #0a0a0f;
+  --foreground: #ffffff;
+
+  /* Card/Panel backgrounds */
+  --card: #12121a;
+  --card-foreground: #ffffff;
+
+  /* Popover/Dropdown */
+  --popover: #1a1a25;
+  --popover-foreground: #ffffff;
+
+  /* Primary - Accent color (Indigo) */
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+
+  /* Secondary - Subtle backgrounds */
+  --secondary: #1a1a25;
+  --secondary-foreground: #ffffff;
+
+  /* Muted - Disabled/subtle text */
+  --muted: #22222f;
+  --muted-foreground: #a0a0b0;
+
+  /* Accent - Hover states */
+  --accent: #22222f;
+  --accent-foreground: #ffffff;
+
+  /* Destructive - Errors */
+  --destructive: #ef4444;
+
+  /* Borders */
+  --border: #2a2a3a;
+  --input: #2a2a3a;
+  --ring: #6366f1;
+
+  /* Trading Colors - CRITICAL */
+  --long: #00c853;
+  --long-foreground: #ffffff;
+  --short: #ff1744;
+  --short-foreground: #ffffff;
+
+  /* Chart colors */
+  --chart-1: #6366f1;
+  --chart-2: #00c853;
+  --chart-3: #ff1744;
+  --chart-4: #fbbf24;
+  --chart-5: #818cf8;
+}
+
+/* Light theme (optional) */
+.light {
+  --background: #ffffff;
+  --foreground: #1a1a2e;
+  --card: #f8f9fa;
+  --card-foreground: #1a1a2e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a2e;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f3f4;
+  --secondary-foreground: #1a1a2e;
+  --muted: #f1f3f4;
+  --muted-foreground: #4a4a5a;
+  --accent: #f1f3f4;
+  --accent-foreground: #1a1a2e;
+  --destructive: #ef4444;
+  --border: #e0e0e0;
+  --input: #e0e0e0;
+  --ring: #6366f1;
+  --long: #00a844;
+  --long-foreground: #ffffff;
+  --short: #d32f2f;
+  --short-foreground: #ffffff;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    @apply antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+}
+
+/* ============================================
+   Typography for Numbers/Prices
+   ============================================ */
+.font-mono,
+.tabular-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================
+   Custom Scrollbar
+   ============================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--card);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* ============================================
+   Form Elements
+   ============================================ */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ============================================
+   Trading-Specific Utilities
+   ============================================ */
+.text-long {
+  color: var(--long);
+}
+
+.text-short {
+  color: var(--short);
+}
+
+.bg-long {
+  background-color: var(--long);
+}
+
+.bg-short {
+  background-color: var(--short);
+}
+
+.bg-long\/10 {
+  background-color: rgb(0 200 83 / 0.1);
+}
+
+.bg-short\/10 {
+  background-color: rgb(255 23 68 / 0.1);
+}
+
+/* Price flash animations */
+@keyframes flash-green {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgb(0 200 83 / 0.2); }
+}
+
+@keyframes flash-red {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgb(255 23 68 / 0.2); }
+}
+
+.animate-flash-green {
+  animation: flash-green 0.3s ease-out;
+}
+
+.animate-flash-red {
+  animation: flash-red 0.3s ease-out;
+}
+
+/* ============================================
+   Orderbook Depth Visualization
+   ============================================ */
+.orderbook-row {
+  position: relative;
+}
+
+.orderbook-depth-bid {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgb(0 200 83 / 0.15);
+  pointer-events: none;
+}
+
+.orderbook-depth-ask {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgb(255 23 68 / 0.15);
+  pointer-events: none;
+}
+
+/* ============================================
+   Selection
+   ============================================ */
+::selection {
+  background: rgb(99 102 241 / 0.3);
+  color: #ffffff;
+}
+
+/* ============================================
+   Focus Styles
+   ============================================ */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   Responsive Utilities
+   ============================================ */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .show-mobile-only {
+    display: none !important;
+  }
+}
