@@ -10,6 +10,7 @@ import { RecentTrades } from "@/components/trading/recent-trades";
 import { BuilderApprovalModal } from "@/components/trading/builder-approval-modal";
 import { Chart } from "@/components/trading/chart";
 import { CommandPalette, useKeyboardShortcuts } from "@/components/ui/command-palette";
+import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { XPBarCompact } from "@/components/gamification/xp-bar";
 import { useAppStore } from "@/store";
 import Link from "next/link";
@@ -27,7 +28,7 @@ import {
 
 function NavSidebar() {
   return (
-    <div className="hidden lg:flex flex-col w-12 bg-card border-r border-border py-2 gap-1">
+    <div className="hidden lg:flex flex-col w-12 glass border-r border-border py-2 gap-1">
       <NavItem href="/feed" icon={<MessageSquare className="h-5 w-5" />} label="Feed" />
       <NavItem href="/achievements" icon={<Trophy className="h-5 w-5" />} label="Achievements" />
       <NavItem href="/challenges" icon={<Flame className="h-5 w-5" />} label="Challenges" />
@@ -43,13 +44,13 @@ function NavItem({ href, icon, label }: { href: string; icon: React.ReactNode; l
   return (
     <Link
       href={href}
-      className="flex items-center justify-center p-2 mx-1 rounded-lg hover:bg-muted transition-colors group relative"
+      className="flex items-center justify-center p-2 mx-1 rounded-lg hover:bg-accent hover:neon-glow transition-all duration-200 group relative"
       title={label}
     >
-      <span className="text-muted-foreground group-hover:text-foreground transition-colors">
+      <span className="text-muted-foreground group-hover:text-primary transition-colors">
         {icon}
       </span>
-      <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+      <span className="absolute left-full ml-2 px-2 py-1 glass text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none neon-border">
         {label}
       </span>
     </Link>
@@ -170,13 +171,16 @@ export default function TradingPage() {
 
       {/* Modals */}
       <BuilderApprovalModal />
+      <SettingsDialog />
 
       {/* Loading Overlay */}
       {isInitializing && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="absolute inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="flex flex-col items-center gap-4">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 animate-pulse" />
-            <p className="text-sm text-muted-foreground">Loading markets...</p>
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center animate-neon-pulse">
+              <span className="text-2xl">🐱</span>
+            </div>
+            <p className="text-sm gradient-text font-medium">Loading Zero's Hypurr Terminal...</p>
           </div>
         </div>
       )}

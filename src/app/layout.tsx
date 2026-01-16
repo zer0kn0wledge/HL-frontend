@@ -7,9 +7,9 @@ import { config } from "@/lib/wagmi-config";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HL Trader | Hyperliquid Trading Frontend",
-  description: "Trade perpetual futures on Hyperliquid with builder code integration",
-  keywords: ["Hyperliquid", "trading", "perpetual futures", "DeFi", "crypto"],
+  title: "Zero's Hypurr Terminal | DeFi Trading Platform",
+  description: "The ultimate DeFi perpetual trading terminal on Hyperliquid with gamification, social features, and advanced analytics",
+  keywords: ["Hyperliquid", "trading", "perpetual futures", "DeFi", "crypto", "Hypurr", "terminal"],
 };
 
 export default async function RootLayout({
@@ -30,7 +30,10 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className="dark">
-      <body className="bg-zinc-950 font-sans text-white antialiased">
+      <body className="bg-background font-sans text-white antialiased">
+        {/* Animated Background */}
+        <div className="animated-bg" />
+        <div className="grid-overlay" />
         <Providers initialState={initialState}>{children}</Providers>
       </body>
     </html>

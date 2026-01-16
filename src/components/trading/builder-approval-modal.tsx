@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useWalletClient } from "wagmi";
 import { toast } from "sonner";
-import { Shield, Check, Loader2 } from "lucide-react";
+import { Shield, Check, Loader2, AlertTriangle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAppStore } from "@/store";
 import { BUILDER_CONFIG } from "@/lib/constants";
 import { createExchangeClient, approveBuilderFee } from "@/lib/hyperliquid";
@@ -25,26 +26,42 @@ export function BuilderApprovalModal() {
     useAppStore();
   const { data: walletClient } = useWalletClient();
   const [isApproving, setIsApproving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleApprove = useCallback(async () => {
     if (!walletClient) return;
 
     setIsApproving(true);
+    setError(null);
     try {
       const exchangeClient = createExchangeClient(walletClient);
       await approveBuilderFee(exchangeClient);
       setBuilderApproved(true);
       setShowBuilderApprovalModal(false);
       toast.success("Builder fee approved successfully");
-    } catch (error) {
-      console.error("Failed to approve builder fee:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to approve builder fee"
-      );
+    } catch (err) {
+      console.error("Failed to approve builder fee:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to approve builder fee";
+
+      // Check for common errors and provide helpful messages
+      if (errorMessage.toLowerCase().includes("insufficient balance")) {
+        setError("The builder wallet needs to be set up on Hyperliquid. This is a configuration issue - trading may still work without builder fees.");
+      } else if (errorMessage.toLowerCase().includes("rejected")) {
+        setError("Transaction was rejected. Please try again.");
+      } else {
+        setError(errorMessage);
+      }
+      toast.error(errorMessage);
     } finally {
       setIsApproving(false);
     }
   }, [walletClient, setBuilderApproved, setShowBuilderApprovalModal]);
+
+  const handleSkip = useCallback(() => {
+    // Allow users to skip and try trading without builder approval
+    setShowBuilderApprovalModal(false);
+    toast.info("You can trade on Hyperliquid directly without builder fees.");
+  }, [setShowBuilderApprovalModal]);
 
   return (
     <Dialog
@@ -106,19 +123,42 @@ export function BuilderApprovalModal() {
           </div>
         </div>
 
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Actions */}
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => setShowBuilderApprovalModal(false)}
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handleSkip}
+            >
+              Skip for Now
+            </Button>
+            <Button className="flex-1" onClick={handleApprove} disabled={isApproving}>
+              {isApproving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Approve & Continue
+            </Button>
+          </div>
+
+          {/* Direct Trading Link */}
+          <a
+            href="https://app.hyperliquid.xyz/trade"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Cancel
-          </Button>
-          <Button className="flex-1" onClick={handleApprove} disabled={isApproving}>
-            {isApproving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Approve & Continue
-          </Button>
+            <ExternalLink className="h-3 w-3" />
+            Trade directly on Hyperliquid
+          </a>
         </div>
       </DialogContent>
     </Dialog>

@@ -36,7 +36,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useAppStore } from "@/store";
+import { useAppStore, useSettingsStore } from "@/store";
 
 // ============================================
 // Command Types
@@ -61,7 +61,7 @@ export function CommandPalette() {
   const router = useRouter();
   const { isConnected, address } = useAccount();
   const { open: openWallet } = useAppKit();
-  const { setCurrentMarket } = useAppStore();
+  const { setCurrentMarket, setSettingsOpen } = useAppStore();
 
   // Listen for keyboard shortcut
   React.useEffect(() => {
@@ -172,7 +172,7 @@ export function CommandPalette() {
       label: "Open Settings",
       icon: <Settings className="h-4 w-4" />,
       shortcut: "⌘,",
-      action: () => router.push("/settings"),
+      action: () => setSettingsOpen(true),
       keywords: ["preferences", "config"],
       group: "settings",
     },
@@ -184,21 +184,7 @@ export function CommandPalette() {
   }, []);
 
   return (
-    <>
-      {/* Trigger Button */}
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border hover:bg-muted transition-colors text-sm text-muted-foreground"
-      >
-        <Search className="h-4 w-4" />
-        <span className="hidden sm:inline">Search...</span>
-        <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium">
-          <span className="text-xs">⌘</span>K
-        </kbd>
-      </button>
-
-      {/* Command Dialog */}
-      <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput placeholder="Type a command or search..." />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
@@ -279,8 +265,7 @@ export function CommandPalette() {
               ))}
           </CommandGroup>
         </CommandList>
-      </CommandDialog>
-    </>
+    </CommandDialog>
   );
 }
 
