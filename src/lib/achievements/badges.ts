@@ -2,7 +2,10 @@
 // Achievement Badge Definitions
 // ============================================
 
-import type { Badge, BadgeRarity } from "@/types/social";
+import type { Badge, BadgeRarity, BadgeCategory } from "@/types/social";
+
+// Re-export types for convenience
+export type { Badge, BadgeRarity, BadgeCategory } from "@/types/social";
 
 // Rarity colors for UI
 export const BADGE_RARITY_COLORS: Record<BadgeRarity, string> = {
@@ -11,6 +14,7 @@ export const BADGE_RARITY_COLORS: Record<BadgeRarity, string> = {
   rare: "from-blue-400 to-blue-600",
   epic: "from-purple-400 to-purple-600",
   legendary: "from-yellow-400 to-orange-500",
+  mythic: "from-red-400 to-pink-600",
 };
 
 export const BADGE_RARITY_GLOW: Record<BadgeRarity, string> = {
@@ -19,6 +23,17 @@ export const BADGE_RARITY_GLOW: Record<BadgeRarity, string> = {
   rare: "shadow-blue-500/30",
   epic: "shadow-purple-500/40",
   legendary: "shadow-yellow-500/50",
+  mythic: "shadow-red-500/60",
+};
+
+// XP rewards per rarity
+export const BADGE_XP_REWARDS: Record<BadgeRarity, number> = {
+  common: 200,
+  uncommon: 500,
+  rare: 1000,
+  epic: 2500,
+  legendary: 5000,
+  mythic: 10000,
 };
 
 // All badge definitions

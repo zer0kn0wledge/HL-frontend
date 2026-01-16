@@ -86,7 +86,7 @@ export interface ProfileStats {
 // Badge/Achievement Types
 // ============================================
 
-export type BadgeRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
+export type BadgeRarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic";
 
 export type BadgeCategory =
   | "trading"
