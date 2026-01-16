@@ -10,7 +10,7 @@ import type { BuilderConfig, CandleInterval, TimeInForce, UserSettings } from "@
 
 export const BUILDER_CONFIG: BuilderConfig = {
   address: "0x0000000000000000000000000000000000000000" as const,
-  name: "HyperTerminal",
+  name: "Zero's Hypurr Terminal",
   feeRate: 50, // 50 = 0.005% (in 1/10000th of bps)
   maxFeeRate: "0.05%",
 };

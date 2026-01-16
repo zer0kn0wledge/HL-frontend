@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Settings, Menu, Wifi, WifiOff } from "lucide-react";
+import { Settings, Menu, Wifi, WifiOff, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -167,13 +167,15 @@ export function Header() {
 
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-            <span className="text-xs font-bold text-white">HT</span>
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+            <span className="text-lg">🐱</span>
           </div>
           <div className="hidden sm:block">
-            <div className="text-sm font-bold">{BUILDER_CONFIG.name}</div>
+            <div className="text-sm font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+              {BUILDER_CONFIG.name}
+            </div>
             <div className="text-[10px] text-muted-foreground">
-              Hyperliquid Trading
+              DeFi Trading Terminal
             </div>
           </div>
         </div>
@@ -196,6 +198,27 @@ export function Header() {
 
         {/* Connection Status */}
         <ConnectionStatus />
+
+        {/* Search (Cmd+K) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            // Trigger the command palette
+            const event = new KeyboardEvent('keydown', {
+              key: 'k',
+              metaKey: true,
+              bubbles: true,
+            });
+            document.dispatchEvent(event);
+          }}
+        >
+          <Search className="h-4 w-4" />
+          <kbd className="hidden md:inline-flex h-5 items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[10px]">
+            <span>⌘</span>K
+          </kbd>
+        </Button>
 
         {/* Settings */}
         <Button

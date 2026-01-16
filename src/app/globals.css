@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================
-   HyperTerminal - Professional Trading Theme
+   Zero's Hypurr Terminal - Neon Trading Theme
    ============================================ */
 
 @theme inline {
@@ -34,6 +34,12 @@
   --color-short: var(--short);
   --color-short-foreground: var(--short-foreground);
 
+  /* Neon colors */
+  --color-neon-green: var(--neon-green);
+  --color-neon-purple: var(--neon-purple);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-pink: var(--neon-pink);
+
   /* Chart colors */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -53,84 +59,90 @@
 }
 
 /* ============================================
-   Dark Theme (Default for Trading)
+   Neon Dark Theme (Default)
    ============================================ */
 :root {
   --radius: 0.5rem;
 
-  /* Background hierarchy */
-  --background: #0a0a0f;
+  /* Deep space background */
+  --background: #050508;
   --foreground: #ffffff;
 
-  /* Card/Panel backgrounds */
-  --card: #12121a;
+  /* Card/Panel backgrounds with slight transparency */
+  --card: rgba(15, 15, 25, 0.9);
   --card-foreground: #ffffff;
 
   /* Popover/Dropdown */
-  --popover: #1a1a25;
+  --popover: rgba(20, 20, 35, 0.95);
   --popover-foreground: #ffffff;
 
-  /* Primary - Accent color (Indigo) */
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
+  /* Primary - Neon Green accent */
+  --primary: #00ff87;
+  --primary-foreground: #000000;
 
-  /* Secondary - Subtle backgrounds */
-  --secondary: #1a1a25;
+  /* Secondary - Deep purple */
+  --secondary: rgba(139, 92, 246, 0.15);
   --secondary-foreground: #ffffff;
 
-  /* Muted - Disabled/subtle text */
-  --muted: #22222f;
-  --muted-foreground: #a0a0b0;
+  /* Muted - Subtle elements */
+  --muted: rgba(30, 30, 50, 0.8);
+  --muted-foreground: #8888aa;
 
   /* Accent - Hover states */
-  --accent: #22222f;
-  --accent-foreground: #ffffff;
+  --accent: rgba(0, 255, 135, 0.1);
+  --accent-foreground: #00ff87;
 
   /* Destructive - Errors */
-  --destructive: #ef4444;
+  --destructive: #ff3366;
 
-  /* Borders */
-  --border: #2a2a3a;
-  --input: #2a2a3a;
-  --ring: #6366f1;
+  /* Borders with neon glow hint */
+  --border: rgba(0, 255, 135, 0.15);
+  --input: rgba(0, 255, 135, 0.15);
+  --ring: #00ff87;
 
-  /* Trading Colors - CRITICAL */
-  --long: #00c853;
-  --long-foreground: #ffffff;
-  --short: #ff1744;
+  /* Trading Colors - Neon */
+  --long: #00ff87;
+  --long-foreground: #000000;
+  --short: #ff3366;
   --short-foreground: #ffffff;
 
+  /* Neon accent colors */
+  --neon-green: #00ff87;
+  --neon-purple: #8b5cf6;
+  --neon-cyan: #00e5ff;
+  --neon-pink: #ff3366;
+
   /* Chart colors */
-  --chart-1: #6366f1;
-  --chart-2: #00c853;
-  --chart-3: #ff1744;
-  --chart-4: #fbbf24;
-  --chart-5: #818cf8;
+  --chart-1: #00ff87;
+  --chart-2: #8b5cf6;
+  --chart-3: #ff3366;
+  --chart-4: #00e5ff;
+  --chart-5: #fbbf24;
 }
 
-/* Light theme (optional) */
+/* Light theme */
 .light {
-  --background: #ffffff;
+  --background: #fafafa;
   --foreground: #1a1a2e;
-  --card: #f8f9fa;
+  --card: #ffffff;
   --card-foreground: #1a1a2e;
   --popover: #ffffff;
   --popover-foreground: #1a1a2e;
-  --primary: #6366f1;
+  --primary: #10b981;
   --primary-foreground: #ffffff;
-  --secondary: #f1f3f4;
+  --secondary: #f1f5f9;
   --secondary-foreground: #1a1a2e;
-  --muted: #f1f3f4;
-  --muted-foreground: #4a4a5a;
-  --accent: #f1f3f4;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
   --accent-foreground: #1a1a2e;
   --destructive: #ef4444;
-  --border: #e0e0e0;
-  --input: #e0e0e0;
-  --ring: #6366f1;
-  --long: #00a844;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #10b981;
+  --long: #10b981;
   --long-foreground: #ffffff;
-  --short: #d32f2f;
+  --short: #ef4444;
   --short-foreground: #ffffff;
 }
 
@@ -151,7 +163,68 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    position: relative;
+    overflow-x: hidden;
   }
+}
+
+/* ============================================
+   Animated Background
+   ============================================ */
+.animated-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 255, 135, 0.1), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 92, 246, 0.08), transparent),
+    radial-gradient(ellipse 40% 30% at 10% 80%, rgba(0, 229, 255, 0.06), transparent),
+    var(--background);
+  pointer-events: none;
+}
+
+/* Grid overlay */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(0, 255, 135, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 135, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* ============================================
+   Neon Glow Effects
+   ============================================ */
+.neon-glow {
+  box-shadow:
+    0 0 5px rgba(0, 255, 135, 0.3),
+    0 0 10px rgba(0, 255, 135, 0.2),
+    0 0 20px rgba(0, 255, 135, 0.1);
+}
+
+.neon-glow-purple {
+  box-shadow:
+    0 0 5px rgba(139, 92, 246, 0.3),
+    0 0 10px rgba(139, 92, 246, 0.2),
+    0 0 20px rgba(139, 92, 246, 0.1);
+}
+
+.neon-glow-text {
+  text-shadow:
+    0 0 5px rgba(0, 255, 135, 0.5),
+    0 0 10px rgba(0, 255, 135, 0.3),
+    0 0 20px rgba(0, 255, 135, 0.2);
+}
+
+.neon-border {
+  border: 1px solid rgba(0, 255, 135, 0.3);
+  box-shadow:
+    inset 0 0 10px rgba(0, 255, 135, 0.05),
+    0 0 5px rgba(0, 255, 135, 0.1);
 }
 
 /* ============================================
@@ -172,16 +245,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--card);
+  background: rgba(15, 15, 25, 0.5);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: rgba(0, 255, 135, 0.2);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+  background: rgba(0, 255, 135, 0.4);
 }
 
 /* ============================================
@@ -217,22 +290,22 @@ input[type="number"] {
 }
 
 .bg-long\/10 {
-  background-color: rgb(0 200 83 / 0.1);
+  background-color: rgba(0, 255, 135, 0.1);
 }
 
 .bg-short\/10 {
-  background-color: rgb(255 23 68 / 0.1);
+  background-color: rgba(255, 51, 102, 0.1);
 }
 
 /* Price flash animations */
 @keyframes flash-green {
   0%, 100% { background-color: transparent; }
-  50% { background-color: rgb(0 200 83 / 0.2); }
+  50% { background-color: rgba(0, 255, 135, 0.2); }
 }
 
 @keyframes flash-red {
   0%, 100% { background-color: transparent; }
-  50% { background-color: rgb(255 23 68 / 0.2); }
+  50% { background-color: rgba(255, 51, 102, 0.2); }
 }
 
 .animate-flash-green {
@@ -241,6 +314,45 @@ input[type="number"] {
 
 .animate-flash-red {
   animation: flash-red 0.3s ease-out;
+}
+
+/* ============================================
+   Neon Pulse Animation
+   ============================================ */
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 5px rgba(0, 255, 135, 0.3),
+      0 0 10px rgba(0, 255, 135, 0.2),
+      0 0 20px rgba(0, 255, 135, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 10px rgba(0, 255, 135, 0.5),
+      0 0 20px rgba(0, 255, 135, 0.3),
+      0 0 30px rgba(0, 255, 135, 0.2);
+  }
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Gradient Text
+   ============================================ */
+.gradient-text {
+  background: linear-gradient(135deg, #00ff87 0%, #00e5ff 50%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-green {
+  background: linear-gradient(135deg, #00ff87 0%, #10b981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* ============================================
@@ -255,7 +367,7 @@ input[type="number"] {
   right: 0;
   top: 0;
   bottom: 0;
-  background: rgb(0 200 83 / 0.15);
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 135, 0.15));
   pointer-events: none;
 }
 
@@ -264,15 +376,29 @@ input[type="number"] {
   left: 0;
   top: 0;
   bottom: 0;
-  background: rgb(255 23 68 / 0.15);
+  background: linear-gradient(270deg, transparent, rgba(255, 51, 102, 0.15));
   pointer-events: none;
+}
+
+/* ============================================
+   Card Hover Effects
+   ============================================ */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  border-color: rgba(0, 255, 135, 0.3);
+  box-shadow:
+    0 0 10px rgba(0, 255, 135, 0.1),
+    0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 /* ============================================
    Selection
    ============================================ */
 ::selection {
-  background: rgb(99 102 241 / 0.3);
+  background: rgba(0, 255, 135, 0.3);
   color: #ffffff;
 }
 
@@ -282,6 +408,15 @@ input[type="number"] {
 *:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* ============================================
+   Glass Effect
+   ============================================ */
+.glass {
+  background: rgba(15, 15, 25, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 255, 135, 0.1);
 }
 
 /* ============================================
@@ -297,4 +432,27 @@ input[type="number"] {
   .show-mobile-only {
     display: none !important;
   }
+}
+
+/* ============================================
+   Loading Shimmer
+   ============================================ */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 255, 135, 0.05) 0%,
+    rgba(0, 255, 135, 0.1) 50%,
+    rgba(0, 255, 135, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
 }
