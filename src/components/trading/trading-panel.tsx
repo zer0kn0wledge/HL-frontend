@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { useTradingStore } from "@/store/trading-store";
+import { useUserStore } from "@/store";
 import { Positions } from "./positions";
 import { OpenOrders } from "./open-orders";
 import { TradeHistory } from "./trade-history";
 import { cn } from "@/lib/utils";
+import BigNumber from "bignumber.js";
 
 type TabType = "positions" | "orders" | "history";
 
 export function TradingPanel() {
   const [activeTab, setActiveTab] = useState<TabType>("positions");
-  const positions = useTradingStore((s) => s.positions);
-  const openOrders = useTradingStore((s) => s.openOrders);
+  const { positionsWithTpSl, openOrders } = useUserStore();
 
-  const activePositionsCount = positions.filter((p) => parseFloat(p.szi) !== 0).length;
+  const activePositionsCount = positionsWithTpSl.filter(
+    (p) => !new BigNumber(p.szi).isZero()
+  ).length;
   const openOrdersCount = openOrders.length;
 
   const tabs: { id: TabType; label: string; count?: number }[] = [
@@ -24,9 +26,9 @@ export function TradingPanel() {
   ];
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col bg-card rounded-lg border border-border overflow-hidden">
       {/* Tab Headers */}
-      <div className="flex border-b border-zinc-800">
+      <div className="flex border-b border-border">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -34,13 +36,13 @@ export function TradingPanel() {
             className={cn(
               "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
               activeTab === tab.id
-                ? "border-b-2 border-green-500 text-white"
-                : "text-zinc-500 hover:text-zinc-300"
+                ? "border-b-2 border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
-              <span className="rounded-full bg-zinc-700 px-1.5 py-0.5 text-xs">
+              <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs">
                 {tab.count}
               </span>
             )}
