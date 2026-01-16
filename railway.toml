@@ -7,7 +7,3 @@ nixPkgs = ["nodejs_20"]
 
 [deploy]
 startCommand = "node server.js"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 300
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
