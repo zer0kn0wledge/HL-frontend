@@ -27,39 +27,131 @@ import {
 import BigNumber from "bignumber.js";
 
 // ============================================
-// Analytics Mini Dashboard
+// Analytics Dashboard Panel
 // ============================================
 
-function AnalyticsMini() {
+import { useMarketStore } from "@/store";
+import { useMemo } from "react";
+
+function AnalyticsDashboard() {
   const { accountState } = useUserStore();
+  const { currentCoin } = useAppStore();
+  const { marketStats, perpMarkets } = useMarketStore();
+
+  const currentStats = marketStats[currentCoin];
 
   const accountValue = accountState?.marginSummary?.accountValue || "0";
   const marginUsed = accountState?.marginSummary?.totalMarginUsed || "0";
+  const withdrawable = accountState?.marginSummary?.withdrawable || "0";
   const totalPnl = accountState?.marginSummary?.totalRawUsd || "0";
+  const positions = accountState?.assetPositions || [];
+
+  // Calculate 24h change
+  const change24h = useMemo(() => {
+    if (!currentStats?.midPx || !currentStats?.prevDayPx) return 0;
+    const current = new BigNumber(currentStats.midPx);
+    const prev = new BigNumber(currentStats.prevDayPx);
+    if (prev.isZero()) return 0;
+    return current.minus(prev).dividedBy(prev).times(100).toNumber();
+  }, [currentStats]);
+
+  // Top gainers
+  const topMovers = useMemo(() => {
+    return perpMarkets
+      .map(m => {
+        const stats = marketStats[m.coin];
+        if (!stats?.midPx || !stats?.prevDayPx) return null;
+        const current = new BigNumber(stats.midPx);
+        const prev = new BigNumber(stats.prevDayPx);
+        if (prev.isZero()) return null;
+        const change = current.minus(prev).dividedBy(prev).times(100).toNumber();
+        return { coin: m.coin, change, price: stats.midPx };
+      })
+      .filter(Boolean)
+      .sort((a, b) => Math.abs(b!.change) - Math.abs(a!.change))
+      .slice(0, 4);
+  }, [perpMarkets, marketStats]);
 
   return (
-    <div className="flex flex-col gap-2 p-2">
-      <div className="text-[10px] uppercase text-gray-500 font-medium tracking-wider px-1">
-        Portfolio
+    <div className="flex flex-col h-full overflow-y-auto">
+      {/* Portfolio Section */}
+      <div className="p-2 border-b border-white/5">
+        <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2">
+          Portfolio
+        </div>
+        <div className="space-y-1">
+          <StatRow icon={<Wallet className="w-3 h-3" />} label="Value" value={`$${new BigNumber(accountValue).toFormat(2)}`} />
+          <StatRow icon={<BarChart3 className="w-3 h-3" />} label="Margin" value={`$${new BigNumber(marginUsed).toFormat(2)}`} />
+          <StatRow
+            icon={<TrendingUp className="w-3 h-3" />}
+            label="uPnL"
+            value={`$${new BigNumber(totalPnl).toFormat(2)}`}
+            valueColor={new BigNumber(totalPnl).gte(0) ? "text-green-400" : "text-red-400"}
+          />
+          <StatRow icon={<Wallet className="w-3 h-3" />} label="Free" value={`$${new BigNumber(withdrawable).toFormat(2)}`} />
+        </div>
       </div>
-      <div className="space-y-1">
-        <StatRow
-          icon={<Wallet className="w-3 h-3" />}
-          label="Value"
-          value={`$${new BigNumber(accountValue).toFormat(2)}`}
-        />
-        <StatRow
-          icon={<BarChart3 className="w-3 h-3" />}
-          label="Margin"
-          value={`$${new BigNumber(marginUsed).toFormat(2)}`}
-        />
-        <StatRow
-          icon={<TrendingUp className="w-3 h-3" />}
-          label="uPnL"
-          value={`$${new BigNumber(totalPnl).toFormat(2)}`}
-          valueColor={new BigNumber(totalPnl).gte(0) ? "text-green-400" : "text-red-400"}
-        />
+
+      {/* Current Market Stats */}
+      <div className="p-2 border-b border-white/5">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[9px] uppercase text-gray-500 font-medium tracking-wider">{currentCoin}</span>
+          <span className={`text-[10px] font-mono ${change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
+          </span>
+        </div>
+        <div className="space-y-1">
+          {currentStats && (
+            <>
+              <MiniStat label="Mark" value={`$${new BigNumber(currentStats.markPx || 0).toFormat(2)}`} />
+              <MiniStat label="Index" value={`$${new BigNumber(currentStats.oraclePx || 0).toFormat(2)}`} />
+              <MiniStat label="24h Vol" value={`$${new BigNumber(currentStats.dayNtlVlm || 0).dividedBy(1e6).toFormat(2)}M`} />
+              <MiniStat label="OI" value={`$${new BigNumber(currentStats.openInterest || 0).dividedBy(1e6).toFormat(2)}M`} />
+              <MiniStat
+                label="Funding"
+                value={`${new BigNumber(currentStats.funding || 0).times(100).toFixed(4)}%`}
+                valueColor={new BigNumber(currentStats.funding || 0).gte(0) ? 'text-green-400' : 'text-red-400'}
+              />
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Top Movers */}
+      <div className="p-2 border-b border-white/5">
+        <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2">
+          Top Movers
+        </div>
+        <div className="space-y-1">
+          {topMovers.map((m, i) => m && (
+            <div key={m.coin} className="flex items-center justify-between text-[10px]">
+              <span className="text-gray-400 font-mono">{m.coin}</span>
+              <span className={`font-mono ${m.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {m.change >= 0 ? '+' : ''}{m.change.toFixed(2)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Active Positions Summary */}
+      {positions.length > 0 && (
+        <div className="p-2">
+          <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2">
+            Positions ({positions.length})
+          </div>
+          <div className="space-y-1">
+            {positions.slice(0, 4).map(({ position }) => (
+              <div key={position.coin} className="flex items-center justify-between text-[10px]">
+                <span className="text-gray-400 font-mono">{position.coin}</span>
+                <span className={`font-mono ${new BigNumber(position.unrealizedPnl).gte(0) ? 'text-green-400' : 'text-red-400'}`}>
+                  ${new BigNumber(position.unrealizedPnl).toFormat(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -76,12 +168,21 @@ function StatRow({
   valueColor?: string;
 }) {
   return (
-    <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-      <div className="flex items-center gap-2 text-gray-400">
+    <div className="flex items-center justify-between px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 transition-colors">
+      <div className="flex items-center gap-1.5 text-gray-400">
         {icon}
-        <span className="text-[10px]">{label}</span>
+        <span className="text-[9px]">{label}</span>
       </div>
-      <span className={`text-xs font-mono font-medium ${valueColor}`}>{value}</span>
+      <span className={`text-[10px] font-mono font-medium ${valueColor}`}>{value}</span>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, valueColor = "text-white" }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[9px] text-gray-500">{label}</span>
+      <span className={`text-[10px] font-mono ${valueColor}`}>{value}</span>
     </div>
   );
 }
@@ -94,10 +195,10 @@ function NavSidebar() {
   return (
     <div className="hidden lg:flex flex-col w-14 glass border-r border-white/5">
       <div className="flex flex-col gap-0.5 py-2">
+        <NavItem href="/profile" icon={<User className="h-4 w-4" />} label="Profile" />
         <NavItem href="/feed" icon={<MessageSquare className="h-4 w-4" />} label="Social Feed" />
         <NavItem href="/achievements" icon={<Trophy className="h-4 w-4" />} label="Achievements" />
         <NavItem href="/challenges" icon={<Flame className="h-4 w-4" />} label="Challenges" />
-        <NavItem href="/settings" icon={<User className="h-4 w-4" />} label="Profile" />
       </div>
       <div className="flex-1" />
       <div className="py-2 px-1">
@@ -180,6 +281,11 @@ export default function TradingPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Nav Sidebar */}
         <NavSidebar />
+
+        {/* Analytics Dashboard Panel - Left */}
+        <div className="hidden xl:flex flex-col w-44 glass border-r border-white/5 flex-shrink-0">
+          <AnalyticsDashboard />
+        </div>
 
         <div className="flex flex-1 overflow-hidden p-1.5 gap-1.5">
           {/* Main Center Area */}

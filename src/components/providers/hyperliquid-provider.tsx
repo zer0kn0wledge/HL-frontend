@@ -21,6 +21,7 @@ import {
   subscribeToTrades,
   fetchPerpMarkets,
   fetchSpotMarkets,
+  fetchHip3Markets,
   fetchMarketStats,
   getClearinghouseState,
   getOpenOrders,
@@ -94,14 +95,16 @@ export function HyperliquidProvider({ children }: { children: ReactNode }) {
 
   const loadMarketData = useCallback(async () => {
     try {
-      const [perpMarkets, spotMarkets, stats] = await Promise.all([
+      const [perpMarkets, spotMarkets, hip3Markets, stats] = await Promise.all([
         fetchPerpMarkets(),
         fetchSpotMarkets(),
+        fetchHip3Markets(),
         fetchMarketStats(),
       ]);
 
       setMarkets("perp", perpMarkets);
       setMarkets("spot", spotMarkets);
+      setMarkets("hip3", hip3Markets);
       setMarketStats(stats);
     } catch (error) {
       console.error("Error loading market data:", error);

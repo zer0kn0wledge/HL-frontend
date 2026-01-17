@@ -151,13 +151,13 @@ export function MarketSelectorDialog({
   const [tab, setTab] = useState<MarketType | "favorites">("perp");
 
   const { currentCoin, currentMarketType, setCurrentMarket } = useAppStore();
-  const { perpMarkets, spotMarkets, marketStats } = useMarketStore();
+  const { perpMarkets, spotMarkets, hip3Markets, marketStats } = useMarketStore();
   const { favoriteMarkets, addFavoriteMarket, removeFavoriteMarket } =
     useSettingsStore();
 
   const allMarkets = useMemo(() => {
-    return [...perpMarkets, ...spotMarkets];
-  }, [perpMarkets, spotMarkets]);
+    return [...perpMarkets, ...spotMarkets, ...hip3Markets];
+  }, [perpMarkets, spotMarkets, hip3Markets]);
 
   const filteredMarkets = useMemo(() => {
     let markets: Market[] = [];
@@ -168,6 +168,8 @@ export function MarketSelectorDialog({
       markets = perpMarkets;
     } else if (tab === "spot") {
       markets = spotMarkets;
+    } else if (tab === "hip3") {
+      markets = hip3Markets;
     }
 
     if (search) {
@@ -185,7 +187,7 @@ export function MarketSelectorDialog({
       const volB = new BigNumber(marketStats[b.coin]?.dayNtlVlm || 0);
       return volB.minus(volA).toNumber();
     });
-  }, [tab, search, allMarkets, perpMarkets, spotMarkets, favoriteMarkets, marketStats]);
+  }, [tab, search, allMarkets, perpMarkets, spotMarkets, hip3Markets, favoriteMarkets, marketStats]);
 
   const handleSelect = useCallback(
     (market: Market) => {
@@ -239,6 +241,7 @@ export function MarketSelectorDialog({
             </TabsTrigger>
             <TabsTrigger value="perp">Perpetuals</TabsTrigger>
             <TabsTrigger value="spot">Spot</TabsTrigger>
+            <TabsTrigger value="hip3" className="text-[#50E3C2]">HIP-3</TabsTrigger>
           </TabsList>
 
           <div className="px-4 pb-2 flex items-center gap-4 text-xs text-muted-foreground border-b border-border">
