@@ -8,6 +8,8 @@ import { usePriceStream } from './usePriceStream';
 import { useBetMonitor } from './useBetMonitor';
 import { useHaptics } from './useHaptics';
 import { playSound } from '@/lib/tap/sounds';
+import { useUserStore } from '@/store';
+import BigNumber from 'bignumber.js';
 
 const initialState: TapTradingState = {
   asset: 'BTC',
@@ -16,7 +18,7 @@ const initialState: TapTradingState = {
   betAmount: DEFAULT_BET_AMOUNT,
   activeBets: [],
   completedBets: [],
-  balance: 100, // Demo balance
+  balance: 0,
   sessionPnL: 0,
   isConnected: false,
 };
@@ -42,7 +44,7 @@ function reducer(state: TapTradingState, action: TapTradingAction): TapTradingSt
       return {
         ...state,
         activeBets: [...state.activeBets, action.payload],
-        balance: state.balance - action.payload.stake,
+        // Don't deduct from balance here - we'll track it separately
       };
 
     case 'BET_WON': {
@@ -54,7 +56,6 @@ function reducer(state: TapTradingState, action: TapTradingAction): TapTradingSt
         ...state,
         activeBets: state.activeBets.filter(b => b.id !== action.payload.id),
         completedBets: [...state.completedBets, { ...bet, status: 'won', pnl: winnings - bet.stake }],
-        balance: state.balance + winnings,
         sessionPnL: state.sessionPnL + (winnings - bet.stake),
       };
     }
@@ -87,6 +88,21 @@ export function useTapTrading() {
   const { trigger: triggerHaptic } = useHaptics();
   const [lastWin, setLastWin] = useState<TapBet | null>(null);
 
+  // Get real balance from user store
+  const { accountState } = useUserStore();
+  const realBalance = useMemo(() => {
+    const withdrawable = accountState?.marginSummary?.withdrawable || '0';
+    return new BigNumber(withdrawable).toNumber();
+  }, [accountState]);
+
+  // Calculate total staked in active bets
+  const totalStaked = useMemo(() => {
+    return state.activeBets.reduce((sum, bet) => sum + bet.stake, 0);
+  }, [state.activeBets]);
+
+  // Available balance = real balance - total staked
+  const availableBalance = realBalance - totalStaked;
+
   // Price stream
   const { currentPrice, priceHistory, isConnected } = usePriceStream({
     asset: state.asset,
@@ -102,6 +118,13 @@ export function useTapTrading() {
   useEffect(() => {
     dispatch({ type: 'SET_CONNECTED', payload: isConnected });
   }, [isConnected]);
+
+  // Sync real balance to state
+  useEffect(() => {
+    if (realBalance !== state.balance) {
+      dispatch({ type: 'SET_BALANCE', payload: realBalance });
+    }
+  }, [realBalance, state.balance]);
 
   // Generate grid boxes
   const gridBoxes = useMemo(() => {
@@ -135,18 +158,10 @@ export function useTapTrading() {
     onBetLost: handleBetLost,
   });
 
-  // Place a bet
+  // Place a bet - allows multiple bets
   const placeBet = useCallback((box: GridBox) => {
-    if (state.balance < state.betAmount) {
-      triggerHaptic('error');
-      return false;
-    }
-
-    // Check if already have bet at this price
-    const existingBet = state.activeBets.find(
-      b => b.targetPrice === box.price && b.direction === box.direction
-    );
-    if (existingBet) {
+    // Check if user has enough available balance
+    if (availableBalance < state.betAmount) {
       triggerHaptic('error');
       return false;
     }
@@ -168,8 +183,18 @@ export function useTapTrading() {
     playSound('tap');
     triggerHaptic('medium');
 
+    // TODO: In production, place actual perp order via Hyperliquid
+    // const order = await placeOrder({
+    //   coin: state.asset,
+    //   isBuy: box.direction === 'long',
+    //   sz: calculateSize(state.betAmount, currentPrice),
+    //   limitPx: box.price.toString(),
+    //   reduceOnly: false,
+    //   orderType: { trigger: { isMarket: true, triggerPx: box.price.toString(), tpsl: box.direction === 'long' ? 'tp' : 'sl' } }
+    // });
+
     return true;
-  }, [state.balance, state.betAmount, state.activeBets, state.asset, currentPrice, triggerHaptic]);
+  }, [availableBalance, state.betAmount, state.asset, currentPrice, triggerHaptic]);
 
   // Set bet amount
   const setBetAmount = useCallback((amount: number) => {
@@ -189,7 +214,7 @@ export function useTapTrading() {
     betAmount: state.betAmount,
     activeBets: state.activeBets,
     completedBets: state.completedBets,
-    balance: state.balance,
+    balance: availableBalance, // Use available balance (real - staked)
     sessionPnL: state.sessionPnL,
     isConnected,
     gridBoxes,
