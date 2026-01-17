@@ -118,15 +118,11 @@ export function HypurrLogoCompact({ className }: HypurrLogoCompactProps) {
         </span>
       </div>
 
-      {/* Text */}
-      <div className="hidden sm:block">
-        <div className="text-sm font-bold leading-tight">
-          <span className="text-white">Zero's </span>
-          <span className="text-[#50E3C2]">Hypurr</span>
-        </div>
-        <div className="text-[10px] text-[#9CA3AF] leading-tight">
-          Terminal
-        </div>
+      {/* Text - all on one line */}
+      <div className="hidden sm:flex items-baseline gap-1">
+        <span className="text-sm font-bold text-white">Zero's</span>
+        <span className="text-sm font-bold text-[#50E3C2]">Hypurr</span>
+        <span className="text-sm font-bold text-white">Terminal</span>
       </div>
     </div>
   );

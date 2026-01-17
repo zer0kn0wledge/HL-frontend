@@ -27,16 +27,18 @@ import {
 import BigNumber from "bignumber.js";
 
 // ============================================
-// Analytics Dashboard Panel
+// Analytics Dashboard Panel - Expanded
 // ============================================
 
 import { useMarketStore } from "@/store";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { TrendingDown, Activity, DollarSign, Percent, Clock, ChevronRight, Target, Zap, PieChart } from "lucide-react";
 
 function AnalyticsDashboard() {
-  const { accountState } = useUserStore();
+  const { accountState, fills, positions } = useUserStore();
   const { currentCoin } = useAppStore();
   const { marketStats, perpMarkets } = useMarketStore();
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'market' | 'activity'>('portfolio');
 
   const currentStats = marketStats[currentCoin];
 
@@ -44,7 +46,23 @@ function AnalyticsDashboard() {
   const marginUsed = accountState?.marginSummary?.totalMarginUsed || "0";
   const withdrawable = accountState?.marginSummary?.withdrawable || "0";
   const totalPnl = accountState?.marginSummary?.totalRawUsd || "0";
-  const positions = accountState?.assetPositions || [];
+  const totalNtlPos = accountState?.marginSummary?.totalNtlPos || "0";
+  const positionList = accountState?.assetPositions || [];
+
+  // Calculate metrics
+  const marginUtilization = useMemo(() => {
+    const value = new BigNumber(accountValue);
+    const margin = new BigNumber(marginUsed);
+    if (value.isZero()) return 0;
+    return margin.dividedBy(value).times(100).toNumber();
+  }, [accountValue, marginUsed]);
+
+  const leverageUsed = useMemo(() => {
+    const value = new BigNumber(accountValue);
+    const ntl = new BigNumber(totalNtlPos);
+    if (value.isZero()) return 0;
+    return ntl.dividedBy(value).toNumber();
+  }, [accountValue, totalNtlPos]);
 
   // Calculate 24h change
   const change24h = useMemo(() => {
@@ -55,9 +73,9 @@ function AnalyticsDashboard() {
     return current.minus(prev).dividedBy(prev).times(100).toNumber();
   }, [currentStats]);
 
-  // Top gainers
-  const topMovers = useMemo(() => {
-    return perpMarkets
+  // Top gainers and losers
+  const { topGainers, topLosers } = useMemo(() => {
+    const sorted = perpMarkets
       .map(m => {
         const stats = marketStats[m.coin];
         if (!stats?.midPx || !stats?.prevDayPx) return null;
@@ -65,124 +83,281 @@ function AnalyticsDashboard() {
         const prev = new BigNumber(stats.prevDayPx);
         if (prev.isZero()) return null;
         const change = current.minus(prev).dividedBy(prev).times(100).toNumber();
-        return { coin: m.coin, change, price: stats.midPx };
+        return { coin: m.coin, change, price: stats.midPx, volume: stats.dayNtlVlm };
       })
       .filter(Boolean)
-      .sort((a, b) => Math.abs(b!.change) - Math.abs(a!.change))
-      .slice(0, 4);
+      .sort((a, b) => b!.change - a!.change);
+
+    return {
+      topGainers: sorted.slice(0, 3),
+      topLosers: sorted.slice(-3).reverse(),
+    };
   }, [perpMarkets, marketStats]);
 
+  // Recent trading activity
+  const recentActivity = useMemo(() => {
+    return fills.slice(0, 5).map(fill => ({
+      coin: fill.coin,
+      side: fill.side,
+      size: fill.sz,
+      price: fill.px,
+      pnl: fill.closedPnl,
+      time: fill.time,
+    }));
+  }, [fills]);
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      {/* Portfolio Section */}
-      <div className="p-2 border-b border-white/5">
-        <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2">
-          Portfolio
-        </div>
-        <div className="space-y-1">
-          <StatRow icon={<Wallet className="w-3 h-3" />} label="Value" value={`$${new BigNumber(accountValue).toFormat(2)}`} />
-          <StatRow icon={<BarChart3 className="w-3 h-3" />} label="Margin" value={`$${new BigNumber(marginUsed).toFormat(2)}`} />
-          <StatRow
-            icon={<TrendingUp className="w-3 h-3" />}
-            label="uPnL"
-            value={`$${new BigNumber(totalPnl).toFormat(2)}`}
-            valueColor={new BigNumber(totalPnl).gte(0) ? "text-green-400" : "text-red-400"}
-          />
-          <StatRow icon={<Wallet className="w-3 h-3" />} label="Free" value={`$${new BigNumber(withdrawable).toFormat(2)}`} />
-        </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Tabs */}
+      <div className="flex border-b border-white/10 shrink-0">
+        {(['portfolio', 'market', 'activity'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-2 text-[9px] uppercase font-medium tracking-wider transition-colors ${
+              activeTab === tab
+                ? 'text-[#50E3C2] border-b-2 border-[#50E3C2] bg-[#50E3C2]/5'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      {/* Current Market Stats */}
-      <div className="p-2 border-b border-white/5">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[9px] uppercase text-gray-500 font-medium tracking-wider">{currentCoin}</span>
-          <span className={`text-[10px] font-mono ${change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
-          </span>
-        </div>
-        <div className="space-y-1">
-          {currentStats && (
-            <>
-              <MiniStat label="Mark" value={`$${new BigNumber(currentStats.markPx || 0).toFormat(2)}`} />
-              <MiniStat label="Index" value={`$${new BigNumber(currentStats.oraclePx || 0).toFormat(2)}`} />
-              <MiniStat label="24h Vol" value={`$${new BigNumber(currentStats.dayNtlVlm || 0).dividedBy(1e6).toFormat(2)}M`} />
-              <MiniStat label="OI" value={`$${new BigNumber(currentStats.openInterest || 0).dividedBy(1e6).toFormat(2)}M`} />
-              <MiniStat
-                label="Funding"
-                value={`${new BigNumber(currentStats.funding || 0).times(100).toFixed(4)}%`}
-                valueColor={new BigNumber(currentStats.funding || 0).gte(0) ? 'text-green-400' : 'text-red-400'}
-              />
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Top Movers */}
-      <div className="p-2 border-b border-white/5">
-        <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2">
-          Top Movers
-        </div>
-        <div className="space-y-1">
-          {topMovers.map((m, i) => m && (
-            <div key={m.coin} className="flex items-center justify-between text-[10px]">
-              <span className="text-gray-400 font-mono">{m.coin}</span>
-              <span className={`font-mono ${m.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {m.change >= 0 ? '+' : ''}{m.change.toFixed(2)}%
-              </span>
+      <div className="flex-1 overflow-y-auto">
+        {/* Portfolio Tab */}
+        {activeTab === 'portfolio' && (
+          <div className="p-2 space-y-3">
+            {/* Account Value - Large Display */}
+            <div className="p-3 rounded-lg bg-gradient-to-br from-[#50E3C2]/10 to-transparent border border-[#50E3C2]/20">
+              <div className="text-[9px] text-gray-500 uppercase mb-1">Account Value</div>
+              <div className="text-xl font-bold font-mono text-white">
+                ${new BigNumber(accountValue).toFormat(2)}
+              </div>
+              <div className={`text-[10px] font-mono mt-1 ${new BigNumber(totalPnl).gte(0) ? 'text-green-400' : 'text-red-400'}`}>
+                {new BigNumber(totalPnl).gte(0) ? '+' : ''}${new BigNumber(totalPnl).toFormat(2)} uPnL
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Active Positions Summary */}
-      {positions.length > 0 && (
-        <div className="p-2">
-          <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2">
-            Positions ({positions.length})
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 gap-2">
+              <QuickStat
+                icon={<Wallet className="w-3 h-3" />}
+                label="Free Margin"
+                value={`$${new BigNumber(withdrawable).toFormat(0)}`}
+              />
+              <QuickStat
+                icon={<BarChart3 className="w-3 h-3" />}
+                label="Used Margin"
+                value={`$${new BigNumber(marginUsed).toFormat(0)}`}
+              />
+              <QuickStat
+                icon={<Percent className="w-3 h-3" />}
+                label="Margin Use"
+                value={`${marginUtilization.toFixed(1)}%`}
+                highlight={marginUtilization > 80}
+              />
+              <QuickStat
+                icon={<Zap className="w-3 h-3" />}
+                label="Leverage"
+                value={`${leverageUsed.toFixed(1)}x`}
+                highlight={leverageUsed > 10}
+              />
+            </div>
+
+            {/* Positions List */}
+            {positionList.length > 0 && (
+              <div>
+                <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2 flex items-center justify-between">
+                  <span>Positions ({positionList.length})</span>
+                  <ChevronRight className="w-3 h-3" />
+                </div>
+                <div className="space-y-1">
+                  {positionList.map(({ position }) => {
+                    const pnl = new BigNumber(position.unrealizedPnl);
+                    const isLong = new BigNumber(position.szi).gt(0);
+                    const roe = new BigNumber(position.returnOnEquity).times(100);
+                    return (
+                      <div key={position.coin} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              isLong ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {isLong ? 'L' : 'S'}
+                            </span>
+                            <span className="text-[11px] font-mono text-white">{position.coin}</span>
+                          </div>
+                          <span className={`text-[10px] font-mono font-bold ${pnl.gte(0) ? 'text-green-400' : 'text-red-400'}`}>
+                            {pnl.gte(0) ? '+' : ''}${pnl.toFormat(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1 text-[9px] text-gray-500">
+                          <span>{new BigNumber(position.szi).abs().toFormat(4)}</span>
+                          <span className={`${roe.gte(0) ? 'text-green-400' : 'text-red-400'}`}>
+                            {roe.gte(0) ? '+' : ''}{roe.toFormat(2)}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-          <div className="space-y-1">
-            {positions.slice(0, 4).map(({ position }) => (
-              <div key={position.coin} className="flex items-center justify-between text-[10px]">
-                <span className="text-gray-400 font-mono">{position.coin}</span>
-                <span className={`font-mono ${new BigNumber(position.unrealizedPnl).gte(0) ? 'text-green-400' : 'text-red-400'}`}>
-                  ${new BigNumber(position.unrealizedPnl).toFormat(2)}
+        )}
+
+        {/* Market Tab */}
+        {activeTab === 'market' && (
+          <div className="p-2 space-y-3">
+            {/* Current Market Header */}
+            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-white">{currentCoin}-PERP</span>
+                <span className={`text-xs font-mono font-bold ${change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
                 </span>
               </div>
-            ))}
+              {currentStats && (
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Mark</span>
+                    <span className="font-mono text-white">${new BigNumber(currentStats.markPx || 0).toFormat(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Index</span>
+                    <span className="font-mono text-white">${new BigNumber(currentStats.oraclePx || 0).toFormat(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">24h Vol</span>
+                    <span className="font-mono text-white">${new BigNumber(currentStats.dayNtlVlm || 0).dividedBy(1e6).toFormat(1)}M</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">OI</span>
+                    <span className="font-mono text-white">${new BigNumber(currentStats.openInterest || 0).dividedBy(1e6).toFormat(1)}M</span>
+                  </div>
+                  <div className="col-span-2 flex justify-between pt-1 border-t border-white/5">
+                    <span className="text-gray-500">Funding (8h)</span>
+                    <span className={`font-mono font-bold ${new BigNumber(currentStats.funding || 0).gte(0) ? 'text-green-400' : 'text-red-400'}`}>
+                      {new BigNumber(currentStats.funding || 0).times(100).toFixed(4)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Top Gainers */}
+            <div>
+              <div className="text-[9px] uppercase text-green-400 font-medium tracking-wider mb-2 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" /> Top Gainers
+              </div>
+              <div className="space-y-1">
+                {topGainers.map((m, i) => m && (
+                  <div key={m.coin} className="flex items-center justify-between text-[10px] p-1.5 rounded bg-green-500/5 hover:bg-green-500/10">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-400 font-bold">{i + 1}</span>
+                      <span className="text-white font-mono">{m.coin}</span>
+                    </div>
+                    <span className="font-mono text-green-400 font-bold">+{m.change.toFixed(2)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top Losers */}
+            <div>
+              <div className="text-[9px] uppercase text-red-400 font-medium tracking-wider mb-2 flex items-center gap-1">
+                <TrendingDown className="w-3 h-3" /> Top Losers
+              </div>
+              <div className="space-y-1">
+                {topLosers.map((m, i) => m && (
+                  <div key={m.coin} className="flex items-center justify-between text-[10px] p-1.5 rounded bg-red-500/5 hover:bg-red-500/10">
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-400 font-bold">{i + 1}</span>
+                      <span className="text-white font-mono">{m.coin}</span>
+                    </div>
+                    <span className="font-mono text-red-400 font-bold">{m.change.toFixed(2)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Activity Tab */}
+        {activeTab === 'activity' && (
+          <div className="p-2 space-y-3">
+            {/* Recent Trades */}
+            <div>
+              <div className="text-[9px] uppercase text-gray-500 font-medium tracking-wider mb-2 flex items-center gap-1">
+                <Activity className="w-3 h-3" /> Recent Fills
+              </div>
+              {recentActivity.length === 0 ? (
+                <div className="text-center py-4 text-gray-500 text-[10px]">
+                  No recent activity
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {recentActivity.map((trade, i) => {
+                    const pnl = new BigNumber(trade.pnl);
+                    const isBuy = trade.side === 'B';
+                    return (
+                      <div key={`${trade.coin}-${trade.time}-${i}`} className="p-2 rounded-lg bg-white/5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              isBuy ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {isBuy ? 'BUY' : 'SELL'}
+                            </span>
+                            <span className="text-[10px] font-mono text-white">{trade.coin}</span>
+                          </div>
+                          {!pnl.isZero() && (
+                            <span className={`text-[10px] font-mono ${pnl.gte(0) ? 'text-green-400' : 'text-red-400'}`}>
+                              {pnl.gte(0) ? '+' : ''}${pnl.toFormat(2)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between mt-1 text-[9px] text-gray-500">
+                          <span>{new BigNumber(trade.size).toFormat(4)} @ ${new BigNumber(trade.price).toFormat(2)}</span>
+                          <span>{new Date(trade.time).toLocaleTimeString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function StatRow({
+function QuickStat({
   icon,
   label,
   value,
-  valueColor = "text-white"
+  highlight = false
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  valueColor?: string;
+  highlight?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 transition-colors">
-      <div className="flex items-center gap-1.5 text-gray-400">
+    <div className={`p-2 rounded-lg transition-colors ${
+      highlight ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-white/5 border border-transparent'
+    }`}>
+      <div className="flex items-center gap-1.5 text-gray-400 mb-1">
         {icon}
-        <span className="text-[9px]">{label}</span>
+        <span className="text-[8px] uppercase">{label}</span>
       </div>
-      <span className={`text-[10px] font-mono font-medium ${valueColor}`}>{value}</span>
-    </div>
-  );
-}
-
-function MiniStat({ label, value, valueColor = "text-white" }: { label: string; value: string; valueColor?: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[9px] text-gray-500">{label}</span>
-      <span className={`text-[10px] font-mono ${valueColor}`}>{value}</span>
+      <div className={`text-[11px] font-mono font-bold ${highlight ? 'text-yellow-400' : 'text-white'}`}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -282,8 +457,8 @@ export default function TradingPage() {
         {/* Nav Sidebar */}
         <NavSidebar />
 
-        {/* Analytics Dashboard Panel - Left */}
-        <div className="hidden xl:flex flex-col w-44 glass border-r border-white/5 flex-shrink-0">
+        {/* Analytics Dashboard Panel - Left (Expanded) */}
+        <div className="hidden xl:flex flex-col w-56 glass border-r border-white/5 flex-shrink-0">
           <AnalyticsDashboard />
         </div>
 
