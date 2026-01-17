@@ -3,7 +3,6 @@
 import { memo, useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GridBox, TapBet, PricePoint } from '@/lib/tap/types';
-import { TIME_LABELS } from '@/lib/tap/constants';
 import { getPriceIncrement, calculateMultiplier } from '@/lib/tap/multiplierCalculator';
 import { ZoomIn, ZoomOut, Clock } from 'lucide-react';
 
@@ -21,6 +20,8 @@ const TIME_PRESETS = [
   { label: '5m', windows: [60, 120, 180, 240, 300, 600] },
 ];
 
+const NUM_ROWS = 8; // Keep it tight for price movement visibility
+
 export const TapChartGrid = memo(function TapChartGrid({
   currentPrice,
   priceHistory,
@@ -32,34 +33,41 @@ export const TapChartGrid = memo(function TapChartGrid({
   const gridRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
 
-  const [priceZoom, setPriceZoom] = useState(1); // 0.5 = zoomed out, 2 = zoomed in
+  const [priceZoom, setPriceZoom] = useState(2); // Start more zoomed in
   const [timePreset, setTimePreset] = useState(0);
-  const [recentWins, setRecentWins] = useState<Set<string>>(new Set());
-  const [recentLosses, setRecentLosses] = useState<Set<string>>(new Set());
+  const [poppedBoxes, setPoppedBoxes] = useState<Map<string, 'win' | 'lose'>>(new Map());
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   const increment = getPriceIncrement(asset) / priceZoom;
   const timeWindows = TIME_PRESETS[timePreset].windows;
 
-  const ROWS_ABOVE = 6;
-  const ROWS_BELOW = 6;
+  // Track elapsed time for column fading
+  useEffect(() => {
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+    }, 100);
+    return () => clearInterval(interval);
+  }, [timePreset]);
 
-  // Generate price levels centered around current price
+  // Generate price levels centered around current price (tight range)
   const priceLevels = useMemo(() => {
     if (!currentPrice) return [];
     const basePrice = Math.round(currentPrice / increment) * increment;
     const levels: number[] = [];
+    const halfRows = Math.floor(NUM_ROWS / 2);
 
-    for (let i = ROWS_ABOVE; i >= 1; i--) {
+    for (let i = halfRows; i >= 1; i--) {
       levels.push(basePrice + i * increment);
     }
-    for (let i = 1; i <= ROWS_BELOW; i++) {
+    for (let i = 0; i < halfRows; i++) {
       levels.push(basePrice - i * increment);
     }
 
     return levels;
   }, [currentPrice, increment]);
 
-  // Generate grid boxes
+  // Generate grid boxes - time windows represent FUTURE time from now
   const gridBoxes = useMemo(() => {
     if (!currentPrice || priceLevels.length === 0) return [];
 
@@ -91,13 +99,11 @@ export const TapChartGrid = memo(function TapChartGrid({
   }, [currentPrice, priceLevels, timeWindows]);
 
   // Get bet for a specific box
-  const getBetForBox = useCallback((price: number, direction: 'long' | 'short') => {
-    return activeBets.find(
-      b => Math.abs(b.targetPrice - price) < increment * 0.5 && b.direction === direction
-    );
-  }, [activeBets, increment]);
+  const getBetForBox = useCallback((boxId: string) => {
+    return activeBets.find(b => b.id.includes(boxId.split('-').slice(0, 3).join('-')));
+  }, [activeBets]);
 
-  // Check for wins/losses and trigger visual feedback
+  // Check for wins/losses and trigger pop effects
   useEffect(() => {
     activeBets.forEach(bet => {
       if (bet.status === 'active') {
@@ -105,32 +111,34 @@ export const TapChartGrid = memo(function TapChartGrid({
           ? currentPrice >= bet.targetPrice
           : currentPrice <= bet.targetPrice;
 
-        if (priceHit) {
-          setRecentWins(prev => new Set(prev).add(bet.id));
+        if (priceHit && !poppedBoxes.has(bet.id)) {
+          // Trigger win pop
+          setPoppedBoxes(prev => new Map(prev).set(bet.id, 'win'));
           setTimeout(() => {
-            setRecentWins(prev => {
-              const next = new Set(prev);
+            setPoppedBoxes(prev => {
+              const next = new Map(prev);
               next.delete(bet.id);
               return next;
             });
-          }, 1500);
+          }, 2000);
         }
 
-        if (Date.now() >= bet.expiresAt) {
-          setRecentLosses(prev => new Set(prev).add(bet.id));
+        if (Date.now() >= bet.expiresAt && !poppedBoxes.has(bet.id)) {
+          // Trigger lose pop
+          setPoppedBoxes(prev => new Map(prev).set(bet.id, 'lose'));
           setTimeout(() => {
-            setRecentLosses(prev => {
-              const next = new Set(prev);
+            setPoppedBoxes(prev => {
+              const next = new Map(prev);
               next.delete(bet.id);
               return next;
             });
-          }, 1500);
+          }, 2000);
         }
       }
     });
-  }, [activeBets, currentPrice]);
+  }, [activeBets, currentPrice, poppedBoxes]);
 
-  // Animated price line drawing
+  // Animated price line - comes from LEFT
   useEffect(() => {
     const canvas = canvasRef.current;
     const grid = gridRef.current;
@@ -149,8 +157,9 @@ export const TapChartGrid = memo(function TapChartGrid({
       if (priceHistory.length < 2) return;
 
       const basePrice = Math.round(currentPrice / increment) * increment;
-      const topPrice = basePrice + ROWS_ABOVE * increment;
-      const bottomPrice = basePrice - ROWS_BELOW * increment;
+      const halfRows = Math.floor(NUM_ROWS / 2);
+      const topPrice = basePrice + halfRows * increment;
+      const bottomPrice = basePrice - (halfRows - 1) * increment;
       const priceRange = topPrice - bottomPrice;
 
       const priceToY = (p: number) => {
@@ -158,29 +167,34 @@ export const TapChartGrid = memo(function TapChartGrid({
         return ((topPrice - clamped) / priceRange) * canvas.height;
       };
 
-      // Get last 60 seconds of data for smooth scrolling
+      // Price line comes from LEFT - show last 30 seconds ending at left edge
       const now = Date.now();
-      const windowMs = 60000;
-      const visibleHistory = priceHistory.filter(p => now - p.time < windowMs);
+      const historyWindowMs = 30000;
+      const visibleHistory = priceHistory.filter(p => now - p.time < historyWindowMs);
 
       if (visibleHistory.length < 2) return;
 
+      // The price line ends at the LEFT edge (around 15% of width)
+      const lineEndX = canvas.width * 0.12;
+
       // Draw gradient fill under price line
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, 'rgba(80, 227, 194, 0.15)');
+      gradient.addColorStop(0, 'rgba(80, 227, 194, 0.1)');
       gradient.addColorStop(0.5, 'rgba(80, 227, 194, 0.05)');
       gradient.addColorStop(1, 'rgba(80, 227, 194, 0)');
 
       ctx.beginPath();
       visibleHistory.forEach((point, i) => {
-        const x = ((point.time - (now - windowMs)) / windowMs) * canvas.width;
+        // Map time so newest point is at lineEndX
+        const age = now - point.time;
+        const x = lineEndX - (age / historyWindowMs) * lineEndX;
         const y = priceToY(point.price);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       });
 
       // Complete fill path
-      ctx.lineTo(canvas.width, canvas.height);
+      ctx.lineTo(lineEndX, canvas.height);
       ctx.lineTo(0, canvas.height);
       ctx.closePath();
       ctx.fillStyle = gradient;
@@ -189,30 +203,40 @@ export const TapChartGrid = memo(function TapChartGrid({
       // Draw price line with glow
       ctx.beginPath();
       ctx.strokeStyle = '#50E3C2';
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.shadowColor = '#50E3C2';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 15;
 
       visibleHistory.forEach((point, i) => {
-        const x = ((point.time - (now - windowMs)) / windowMs) * canvas.width;
+        const age = now - point.time;
+        const x = lineEndX - (age / historyWindowMs) * lineEndX;
         const y = priceToY(point.price);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       });
       ctx.stroke();
 
-      // Draw current price dot
+      // Draw current price dot at the leading edge
       if (visibleHistory.length > 0) {
         const lastPoint = visibleHistory[visibleHistory.length - 1];
-        const x = ((lastPoint.time - (now - windowMs)) / windowMs) * canvas.width;
         const y = priceToY(lastPoint.price);
 
+        // Pulsing glow effect
+        const pulse = 1 + Math.sin(Date.now() / 200) * 0.3;
+
         ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.arc(lineEndX, y, 8 * pulse, 0, Math.PI * 2);
         ctx.fillStyle = '#50E3C2';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 25 * pulse;
+        ctx.fill();
+
+        // Inner dot
+        ctx.beginPath();
+        ctx.arc(lineEndX, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 0;
         ctx.fill();
       }
 
@@ -233,6 +257,16 @@ export const TapChartGrid = memo(function TapChartGrid({
     return `${Math.floor(seconds / 60)}m`;
   };
 
+  // Calculate column opacity based on elapsed time
+  const getColumnOpacity = (colIndex: number) => {
+    const timeWindow = timeWindows[colIndex];
+    // First column fades after its time window passes
+    if (elapsedTime > timeWindow) {
+      return Math.max(0.1, 1 - (elapsedTime - timeWindow) / timeWindow);
+    }
+    return 1;
+  };
+
   if (!currentPrice) {
     return (
       <div className="flex items-center justify-center h-full bg-black">
@@ -241,10 +275,11 @@ export const TapChartGrid = memo(function TapChartGrid({
     );
   }
 
-  const totalRows = ROWS_ABOVE + ROWS_BELOW;
+  // Calculate box size to make them square
+  const boxSize = `min(calc((100% - ${timeWindows.length - 1}px) / ${timeWindows.length}), calc((100% - ${NUM_ROWS - 1}px) / ${NUM_ROWS}))`;
 
   return (
-    <div className="relative w-full h-full bg-black flex flex-col">
+    <div className="relative w-full h-full bg-black flex flex-col overflow-hidden">
       {/* Controls bar */}
       <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
         {/* Time preset selector */}
@@ -268,7 +303,7 @@ export const TapChartGrid = memo(function TapChartGrid({
         {/* Price zoom controls */}
         <div className="flex items-center gap-1 bg-black/80 backdrop-blur rounded-lg border border-white/10 p-1">
           <button
-            onClick={() => setPriceZoom(z => Math.min(3, z * 1.5))}
+            onClick={() => setPriceZoom(z => Math.min(5, z * 1.5))}
             className="p-1 text-gray-400 hover:text-white transition-colors"
             title="Zoom in (tighter price range)"
           >
@@ -285,34 +320,39 @@ export const TapChartGrid = memo(function TapChartGrid({
         </div>
       </div>
 
-      <div className="flex-1 flex">
-        {/* Price labels (Y-axis) */}
+      <div className="flex-1 flex min-h-0">
+        {/* Price labels (Y-axis) - on the LEFT */}
         <div className="w-16 flex flex-col shrink-0">
           {priceLevels.map((price) => {
-            const isLong = price > currentPrice;
+            const isAbove = price > currentPrice;
+            const isCurrent = Math.abs(price - currentPrice) < increment * 0.5;
             return (
               <div
                 key={`price-${price}`}
-                className="flex-1 flex items-center justify-end pr-2 text-[10px] font-mono border-b border-white/5"
-                style={{ color: isLong ? '#22C55E' : '#EF4444' }}
+                className={`flex-1 flex items-center justify-end pr-2 text-[10px] font-mono border-b border-white/5 ${
+                  isCurrent ? 'bg-[#50E3C2]/20' : ''
+                }`}
+                style={{ color: isCurrent ? '#50E3C2' : isAbove ? '#22C55E' : '#EF4444' }}
               >
                 ${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
             );
           })}
-          <div className="h-7 shrink-0" />
+          <div className="h-8 shrink-0" />
         </div>
 
         {/* Main grid area */}
-        <div className="flex-1 flex flex-col relative">
+        <div className="flex-1 flex flex-col relative min-w-0">
           <div
             ref={gridRef}
             className="flex-1 relative"
             style={{
               display: 'grid',
-              gridTemplateRows: `repeat(${totalRows}, 1fr)`,
+              gridTemplateRows: `repeat(${NUM_ROWS}, 1fr)`,
               gridTemplateColumns: `repeat(${timeWindows.length}, 1fr)`,
-              gap: '1px',
+              gap: '2px',
+              aspectRatio: `${timeWindows.length} / ${NUM_ROWS}`,
+              margin: 'auto 0',
             }}
           >
             {/* Canvas for price line */}
@@ -321,26 +361,19 @@ export const TapChartGrid = memo(function TapChartGrid({
               className="absolute inset-0 pointer-events-none z-10"
             />
 
-            {/* Current price indicator */}
-            <div
-              className="absolute left-0 right-0 h-[2px] bg-[#50E3C2] z-20"
-              style={{
-                top: `${(ROWS_ABOVE / totalRows) * 100}%`,
-                boxShadow: '0 0 15px #50E3C2, 0 0 30px rgba(80,227,194,0.5)',
-              }}
-            >
-              <div className="absolute right-0 -top-3 px-2 py-0.5 bg-[#50E3C2] text-black text-[10px] font-bold rounded-l shadow-lg">
-                ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </div>
-            </div>
-
             {/* Grid boxes */}
             {gridBoxes.flat().map((box) => {
-              const bet = getBetForBox(box.price, box.direction);
+              // Find matching bet by price, direction, and approximate time window
+              const bet = activeBets.find(b => {
+                const betDuration = Math.round((b.expiresAt - b.placedAt) / 1000);
+                return Math.abs(b.targetPrice - box.price) < increment * 0.5 &&
+                  b.direction === box.direction &&
+                  Math.abs(betDuration - box.timeWindow) < box.timeWindow * 0.3;
+              });
               const isActive = bet?.status === 'active';
               const isLong = box.direction === 'long';
-              const isWinning = bet && recentWins.has(bet.id);
-              const isLosing = bet && recentLosses.has(bet.id);
+              const popState = bet ? poppedBoxes.get(bet.id) : undefined;
+              const opacity = getColumnOpacity(box.col);
 
               // Calculate time remaining for active bet
               let timeRemaining = 0;
@@ -353,53 +386,90 @@ export const TapChartGrid = memo(function TapChartGrid({
                   key={box.id}
                   className={`
                     relative flex flex-col items-center justify-center
-                    border transition-all duration-100
-                    ${!bet && isLong && 'border-green-500/20 bg-green-500/5 hover:bg-green-500/20 hover:border-green-500/50'}
-                    ${!bet && !isLong && 'border-red-500/20 bg-red-500/5 hover:bg-red-500/20 hover:border-red-500/50'}
-                    ${isActive && !isWinning && !isLosing && 'bg-yellow-400/90 border-yellow-400'}
-                    ${isWinning && 'bg-green-400 border-green-400 animate-pulse'}
-                    ${isLosing && 'bg-red-500 border-red-500 animate-pulse'}
+                    border transition-all duration-150 aspect-square
+                    ${!bet && isLong && 'border-green-500/30 bg-green-500/10 hover:bg-green-500/30 hover:border-green-500/60 hover:scale-105'}
+                    ${!bet && !isLong && 'border-red-500/30 bg-red-500/10 hover:bg-red-500/30 hover:border-red-500/60 hover:scale-105'}
+                    ${isActive && !popState && 'bg-yellow-400/90 border-yellow-400 scale-105'}
                   `}
                   style={{
                     gridRow: box.row + 1,
                     gridColumn: box.col + 1,
-                    boxShadow: isActive ? '0 0 20px rgba(250,204,21,0.5)' :
-                               isWinning ? '0 0 30px rgba(34,197,94,0.8)' :
-                               isLosing ? '0 0 30px rgba(239,68,68,0.8)' : 'none',
+                    opacity: popState ? 1 : opacity,
+                    boxShadow: isActive && !popState ? '0 0 25px rgba(250,204,21,0.6)' : 'none',
                   }}
-                  whileTap={!bet ? { scale: 0.92 } : undefined}
+                  initial={false}
+                  animate={popState === 'win' ? {
+                    scale: [1, 1.8, 0],
+                    opacity: [1, 1, 0],
+                    backgroundColor: ['#22C55E', '#22C55E', '#22C55E'],
+                  } : popState === 'lose' ? {
+                    scale: [1, 1.3, 0],
+                    opacity: [1, 1, 0],
+                    backgroundColor: ['#EF4444', '#EF4444', '#EF4444'],
+                    rotate: [0, 10, -10, 0],
+                  } : {}}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  whileTap={!bet ? { scale: 0.9 } : undefined}
                   onClick={() => !bet && onTap(box)}
-                  disabled={!!bet}
+                  disabled={!!bet || opacity < 0.3}
                 >
-                  <span className={`text-xs font-bold ${
-                    isActive || isWinning || isLosing ? 'text-black' :
-                    isLong ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {box.multiplier.toFixed(1)}x
-                  </span>
-                  {isActive && bet && !isWinning && !isLosing && (
+                  {/* Win explosion effect */}
+                  {popState === 'win' && (
                     <>
-                      <span className="text-[9px] text-black font-bold">${bet.stake}</span>
-                      <span className="text-[8px] text-black/70">{timeRemaining}s</span>
+                      <motion.div
+                        className="absolute inset-0 rounded-lg"
+                        initial={{ scale: 1, opacity: 1 }}
+                        animate={{ scale: 3, opacity: 0 }}
+                        transition={{ duration: 0.6 }}
+                        style={{ backgroundColor: '#22C55E', boxShadow: '0 0 60px #22C55E' }}
+                      />
+                      <span className="text-2xl z-10">💰</span>
                     </>
                   )}
-                  {isWinning && (
-                    <span className="text-[10px] text-black font-bold">WIN!</span>
+
+                  {/* Lose shake effect */}
+                  {popState === 'lose' && (
+                    <>
+                      <motion.div
+                        className="absolute inset-0 rounded-lg"
+                        initial={{ scale: 1, opacity: 1 }}
+                        animate={{ scale: 2, opacity: 0 }}
+                        transition={{ duration: 0.4 }}
+                        style={{ backgroundColor: '#EF4444', boxShadow: '0 0 40px #EF4444' }}
+                      />
+                      <span className="text-2xl z-10">💥</span>
+                    </>
                   )}
-                  {isLosing && (
-                    <span className="text-[10px] text-white font-bold">LOST</span>
+
+                  {/* Normal box content */}
+                  {!popState && (
+                    <>
+                      <span className={`text-sm font-bold ${
+                        isActive ? 'text-black' :
+                        isLong ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {box.multiplier.toFixed(1)}x
+                      </span>
+                      {isActive && bet && (
+                        <>
+                          <span className="text-[10px] text-black font-bold">${bet.stake}</span>
+                          <span className="text-[9px] text-black/70">{timeRemaining}s</span>
+                        </>
+                      )}
+                    </>
                   )}
                 </motion.button>
               );
             })}
           </div>
 
-          {/* Time labels */}
-          <div className="h-7 flex shrink-0 border-t border-white/10">
-            {timeWindows.map((tw) => (
+          {/* Time labels - these represent FUTURE time windows */}
+          <div className="h-8 flex shrink-0 border-t border-white/10">
+            {timeWindows.map((tw, i) => (
               <div
                 key={tw}
-                className="flex-1 flex items-center justify-center text-[10px] text-gray-500 font-medium"
+                className="flex-1 flex items-center justify-center text-[11px] text-gray-400 font-medium"
+                style={{ opacity: getColumnOpacity(i) }}
               >
                 {formatTime(tw)}
               </div>
