@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useCallback, memo } from "react";
-import { motion } from "framer-motion";
 import { ChevronDown, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +16,7 @@ import type { GroupedLevel } from "@/types";
 import BigNumber from "bignumber.js";
 
 // ============================================
-// Order Row Component
+// Order Row Component (Compact)
 // ============================================
 
 interface OrderRowProps {
@@ -39,33 +38,33 @@ const OrderRow = memo(function OrderRow({
     <button
       onClick={onClick}
       className={cn(
-        "relative flex w-full items-center text-xs font-mono h-6 hover:bg-muted/50 transition-colors",
+        "relative flex w-full items-center text-[10px] font-mono h-[18px] hover:bg-white/5 transition-colors",
         isHighlighted && "bg-primary/10"
       )}
     >
       {/* Depth visualization */}
       <div
         className={cn(
-          "absolute top-0 bottom-0 pointer-events-none",
-          isBid ? "right-0 bg-long/15" : "left-0 bg-short/15"
+          "absolute top-0 bottom-0 pointer-events-none transition-all",
+          isBid ? "right-0 bg-green-500/20" : "left-0 bg-red-500/20"
         )}
         style={{ width: `${Math.min(level.percentage, 100)}%` }}
       />
 
       {/* Content */}
-      <div className="relative z-10 flex items-center w-full px-2">
+      <div className="relative z-10 flex items-center w-full px-1.5">
         <span
           className={cn(
-            "flex-1 text-left",
-            isBid ? "text-long" : "text-short"
+            "w-[72px] text-left tabular-nums",
+            isBid ? "text-green-400" : "text-red-400"
           )}
         >
           {formatOrderbookPrice(level.price)}
         </span>
-        <span className="flex-1 text-right text-foreground">
+        <span className="flex-1 text-right text-gray-300 tabular-nums">
           {formatOrderbookSize(level.size)}
         </span>
-        <span className="flex-1 text-right text-muted-foreground">
+        <span className="w-16 text-right text-gray-500 tabular-nums">
           {formatOrderbookSize(level.total)}
         </span>
       </div>
@@ -114,19 +113,19 @@ function GroupingSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs">
-          <Layers className="h-3 w-3" />
+        <Button variant="ghost" size="sm" className="h-5 gap-0.5 px-1.5 text-[10px]">
+          <Layers className="h-2.5 w-2.5" />
           {orderbookGrouping}
-          <ChevronDown className="h-3 w-3" />
+          <ChevronDown className="h-2.5 w-2.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="min-w-0">
         {UI.ORDERBOOK_GROUPINGS.map((g) => (
           <DropdownMenuItem
             key={g}
             onClick={() => handleGroupingChange(g)}
             className={cn(
-              "text-xs font-mono",
+              "text-[10px] font-mono px-2 py-1",
               g === orderbookGrouping && "bg-primary/10"
             )}
           >
@@ -139,7 +138,7 @@ function GroupingSelector() {
 }
 
 // ============================================
-// Spread Display
+// Spread Display (Compact)
 // ============================================
 
 interface SpreadDisplayProps {
@@ -150,15 +149,13 @@ interface SpreadDisplayProps {
 
 function SpreadDisplay({ spread, spreadPercent, midPrice }: SpreadDisplayProps) {
   return (
-    <div className="flex items-center justify-between px-2 py-1.5 bg-muted/30 border-y border-border">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-mono font-semibold text-foreground">
-          {formatOrderbookPrice(midPrice)}
-        </span>
-      </div>
-      <div className="text-xs text-muted-foreground">
+    <div className="flex items-center justify-between px-1.5 py-1 bg-[#50E3C2]/10 border-y border-[#50E3C2]/20">
+      <span className="text-xs font-mono font-bold text-[#50E3C2]">
+        {formatOrderbookPrice(midPrice)}
+      </span>
+      <div className="text-[9px] text-gray-400 flex items-center gap-1">
         <span className="font-mono">{new BigNumber(spread).toFixed(2)}</span>
-        <span className="mx-1">|</span>
+        <span className="text-gray-600">|</span>
         <span className="font-mono">{new BigNumber(spreadPercent).toFixed(3)}%</span>
       </div>
     </div>
@@ -185,30 +182,30 @@ export function Orderbook() {
     [setPrice]
   );
 
-  // Take top 15 levels for display
+  // Take more levels for display (20 each side)
   const displayAsks = useMemo(
-    () => (processedOrderbook?.asks || []).slice(0, 15).reverse(),
+    () => (processedOrderbook?.asks || []).slice(0, 20).reverse(),
     [processedOrderbook]
   );
 
   const displayBids = useMemo(
-    () => (processedOrderbook?.bids || []).slice(0, 15),
+    () => (processedOrderbook?.bids || []).slice(0, 20),
     [processedOrderbook]
   );
 
   return (
-    <div className="flex flex-col h-full bg-card rounded-lg border border-border overflow-hidden">
+    <div className="flex flex-col h-full bg-black/40 rounded-lg border border-white/5 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <h3 className="text-sm font-medium">Order Book</h3>
+      <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/5">
+        <h3 className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Order Book</h3>
         <GroupingSelector />
       </div>
 
       {/* Column Headers */}
-      <div className="flex items-center px-2 py-1.5 text-xs text-muted-foreground border-b border-border">
-        <span className="flex-1 text-left">Price</span>
+      <div className="flex items-center px-1.5 py-1 text-[9px] text-gray-500 border-b border-white/5">
+        <span className="w-[72px] text-left">Price</span>
         <span className="flex-1 text-right">Size</span>
-        <span className="flex-1 text-right">Total</span>
+        <span className="w-16 text-right">Total</span>
       </div>
 
       {/* Order Book Content */}
@@ -226,7 +223,7 @@ export function Orderbook() {
             ))
           ) : (
             <div className="flex-1 flex items-end justify-center pb-2">
-              <span className="text-xs text-muted-foreground">No asks</span>
+              <span className="text-[10px] text-gray-600">No asks</span>
             </div>
           )}
         </div>
@@ -251,7 +248,7 @@ export function Orderbook() {
             ))
           ) : (
             <div className="flex-1 flex items-start justify-center pt-2">
-              <span className="text-xs text-muted-foreground">No bids</span>
+              <span className="text-[10px] text-gray-600">No bids</span>
             </div>
           )}
         </div>
