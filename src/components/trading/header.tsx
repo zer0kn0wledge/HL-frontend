@@ -13,6 +13,7 @@ import {
 import { ConnectButton } from "@/components/wallet/connect-button";
 import { MarketSelectorButton } from "./market-selector";
 import { HypurrLogoCompact } from "@/components/brand/hypurr-logo";
+import { ModeNav } from "@/components/layout/ModeNav";
 import { useAppStore, useMarketStore, useUserStore } from "@/store";
 import { cn } from "@/lib/utils";
 import BigNumber from "bignumber.js";
@@ -172,6 +173,11 @@ export function Header() {
 
         {/* Market Selector */}
         <MarketSelectorButton />
+
+        <Separator orientation="vertical" className="h-6 hidden md:block opacity-20" />
+
+        {/* Mode Navigation */}
+        <ModeNav />
       </div>
 
       {/* Center Section - Market Stats */}
