@@ -3,10 +3,10 @@
 import { useTapTrading } from '@/hooks/tap/useTapTrading';
 import { TapHeader } from './TapHeader';
 import { AssetSelector } from './AssetSelector';
-import { PriceLineChart } from './PriceLineChart';
-import { TapGrid } from './TapGrid';
+import { TapChartGrid } from './TapChartGrid';
 import { BetControls } from './BetControls';
 import { WinCelebration } from './WinCelebration';
+import { GridBox } from '@/lib/tap/types';
 
 export function TapTradingView() {
   const {
@@ -18,7 +18,6 @@ export function TapTradingView() {
     balance,
     sessionPnL,
     isConnected,
-    gridBoxes,
     lastWin,
     placeBet,
     setBetAmount,
@@ -26,34 +25,32 @@ export function TapTradingView() {
     clearLastWin,
   } = useTapTrading();
 
+  const handleTap = (box: GridBox) => {
+    placeBet(box);
+  };
+
   return (
     <div className="flex flex-col h-full bg-black">
       {/* Header */}
       <TapHeader isConnected={isConnected} />
 
-      {/* Asset selector and chart */}
-      <div className="p-4 space-y-3">
+      {/* Asset selector - floating top left */}
+      <div className="absolute top-16 left-4 z-30">
         <AssetSelector
           value={asset}
           currentPrice={currentPrice}
           onChange={setAsset}
         />
-
-        <PriceLineChart
-          priceHistory={priceHistory}
-          currentPrice={currentPrice}
-          activeBets={activeBets}
-        />
       </div>
 
-      {/* Tap Grid */}
-      <div className="flex-1 overflow-auto">
-        <TapGrid
-          longBoxes={gridBoxes.longBoxes}
-          shortBoxes={gridBoxes.shortBoxes}
-          activeBets={activeBets}
+      {/* Main chart + grid area */}
+      <div className="flex-1 relative">
+        <TapChartGrid
           currentPrice={currentPrice}
-          onTap={placeBet}
+          priceHistory={priceHistory}
+          asset={asset}
+          activeBets={activeBets}
+          onTap={handleTap}
         />
       </div>
 
