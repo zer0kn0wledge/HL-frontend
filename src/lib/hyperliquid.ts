@@ -463,32 +463,108 @@ export async function fetchSpotMarkets(): Promise<Market[]> {
       // Create display name from token pair
       let displayName = asset.name;
       if (tokens && tokens.length >= 2) {
-        const baseToken = spotTokens[tokens[0].index];
-        const quoteToken = spotTokens[tokens[1].index];
+        // Handle both formats: tokens can be objects with index property or direct indices
+        const baseTokenIndex = typeof tokens[0] === 'object' ? tokens[0].index : tokens[0];
+        const quoteTokenIndex = typeof tokens[1] === 'object' ? tokens[1].index : tokens[1];
+
+        const baseToken = spotTokens[baseTokenIndex];
+        const quoteToken = spotTokens[quoteTokenIndex];
+
         if (baseToken?.name && quoteToken?.name) {
           displayName = `${baseToken.name}/${quoteToken.name}`;
         }
       }
 
+      // Get size decimals properly
+      const baseTokenIndex = tokens && tokens.length >= 1
+        ? (typeof tokens[0] === 'object' ? tokens[0].index : tokens[0])
+        : 0;
+      const szDecimals = spotTokens[baseTokenIndex]?.szDecimals || 8;
+
       return {
         type: "spot" as MarketType,
         coin: asset.name,
         name: displayName,
-        szDecimals: tokens[0]?.szDecimals || 8,
+        szDecimals,
         pxDecimals: calculatePriceDecimals(ctx?.midPx || "0"),
-        minSz: new BigNumber(1).shiftedBy(-(tokens[0]?.szDecimals || 8)).toString(),
+        minSz: new BigNumber(1).shiftedBy(-szDecimals).toString(),
         tickSize: "0.0001",
         spotMeta: {
           tokens,
           name: asset.name,
           displayName,
           index,
-          isCanonical: asset.isCanonical || true,
+          isCanonical: asset.isCanonical !== false,
         },
       };
     });
   } catch (error) {
     console.error("Error fetching spot markets:", error);
+    return [];
+  }
+}
+
+// ============================================
+// HIP-3 Markets (Builder-operated spot pairs)
+// ============================================
+
+export async function fetchHip3Markets(): Promise<Market[]> {
+  try {
+    // HIP-3 markets are builder-operated spot pairs that can be fetched from spot meta
+    // They typically have isCanonical: false or are in a separate section
+    const [spotMeta, assetCtxs] = await getSpotMetaAndAssetCtxs();
+    const spotTokens = (spotMeta as any).tokens || [];
+    const universe = (spotMeta as any).universe || [];
+
+    // Filter for HIP-3 markets (non-canonical markets with builder info)
+    const hip3Markets = universe
+      .map((asset: any, index: number) => {
+        // Skip canonical markets
+        if (asset.isCanonical !== false) return null;
+
+        const ctx = (assetCtxs as any[])[index];
+        const tokens = asset.tokens;
+
+        // Create display name from token pair
+        let displayName = asset.name;
+        if (tokens && tokens.length >= 2) {
+          const baseTokenIndex = typeof tokens[0] === 'object' ? tokens[0].index : tokens[0];
+          const quoteTokenIndex = typeof tokens[1] === 'object' ? tokens[1].index : tokens[1];
+
+          const baseToken = spotTokens[baseTokenIndex];
+          const quoteToken = spotTokens[quoteTokenIndex];
+
+          if (baseToken?.name && quoteToken?.name) {
+            displayName = `${baseToken.name}/${quoteToken.name}`;
+          }
+        }
+
+        const baseTokenIndex = tokens && tokens.length >= 1
+          ? (typeof tokens[0] === 'object' ? tokens[0].index : tokens[0])
+          : 0;
+        const szDecimals = spotTokens[baseTokenIndex]?.szDecimals || 8;
+
+        return {
+          type: "hip3" as MarketType,
+          coin: asset.name,
+          name: displayName,
+          szDecimals,
+          pxDecimals: calculatePriceDecimals(ctx?.midPx || "0"),
+          minSz: new BigNumber(1).shiftedBy(-szDecimals).toString(),
+          tickSize: "0.0001",
+          hip3Meta: {
+            name: asset.name,
+            builderAddress: asset.builder || "",
+            feeRate: asset.feeRate || 0,
+            tokens,
+          },
+        };
+      })
+      .filter(Boolean);
+
+    return hip3Markets;
+  } catch (error) {
+    console.error("Error fetching HIP-3 markets:", error);
     return [];
   }
 }

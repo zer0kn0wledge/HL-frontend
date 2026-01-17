@@ -4,6 +4,7 @@ import { cookieToInitialState } from "wagmi";
 
 import { Providers } from "@/components/providers";
 import { config } from "@/lib/wagmi-config";
+import { CursorGlow } from "@/components/ui/cursor-glow";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default async function RootLayout({
         <div className="animated-bg" />
         <div className="grid-overlay" />
         <div className="noise-overlay" />
+        <CursorGlow />
         <Providers initialState={initialState}>{children}</Providers>
       </body>
     </html>
