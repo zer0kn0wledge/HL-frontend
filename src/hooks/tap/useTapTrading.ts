@@ -14,6 +14,9 @@ import { PERP_ASSET_INDEXES } from '@/lib/constants';
 import { useWalletClient } from 'wagmi';
 import BigNumber from 'bignumber.js';
 
+// Demo mode starting balance
+const DEMO_STARTING_BALANCE = 1000;
+
 const initialState: TapTradingState = {
   asset: 'BTC',
   currentPrice: 0,
@@ -47,7 +50,6 @@ function reducer(state: TapTradingState, action: TapTradingAction): TapTradingSt
       return {
         ...state,
         activeBets: [...state.activeBets, action.payload],
-        // Don't deduct from balance here - we'll track it separately
       };
 
     case 'BET_WON': {
@@ -92,7 +94,11 @@ export function useTapTrading() {
   const [lastWin, setLastWin] = useState<TapBet | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  // Get wallet client for signing orders
+  // Demo mode - starts ON by default for easy testing
+  const [isDemoMode, setIsDemoMode] = useState(true);
+  const [demoBalance, setDemoBalance] = useState(DEMO_STARTING_BALANCE);
+
+  // Get wallet client for signing orders (real mode only)
   const { data: walletClient } = useWalletClient();
 
   // Get real balance from user store
@@ -107,8 +113,10 @@ export function useTapTrading() {
     return state.activeBets.reduce((sum, bet) => sum + bet.stake, 0);
   }, [state.activeBets]);
 
-  // Available balance = real balance - total staked
-  const availableBalance = realBalance - totalStaked;
+  // Available balance depends on mode
+  const availableBalance = isDemoMode
+    ? demoBalance - totalStaked
+    : realBalance - totalStaked;
 
   // Price stream
   const { currentPrice, priceHistory, isConnected } = usePriceStream({
@@ -126,12 +134,13 @@ export function useTapTrading() {
     dispatch({ type: 'SET_CONNECTED', payload: isConnected });
   }, [isConnected]);
 
-  // Sync real balance to state
+  // Sync balance to state based on mode
   useEffect(() => {
-    if (realBalance !== state.balance) {
-      dispatch({ type: 'SET_BALANCE', payload: realBalance });
+    const balance = isDemoMode ? demoBalance : realBalance;
+    if (balance !== state.balance) {
+      dispatch({ type: 'SET_BALANCE', payload: balance });
     }
-  }, [realBalance, state.balance]);
+  }, [realBalance, demoBalance, isDemoMode, state.balance]);
 
   // Generate grid boxes
   const gridBoxes = useMemo(() => {
@@ -143,21 +152,33 @@ export function useTapTrading() {
   const handleBetWon = useCallback((bet: TapBet) => {
     dispatch({ type: 'BET_WON', payload: { id: bet.id, pnl: bet.stake * bet.multiplier } });
     triggerHaptic('success');
+    playSound('win');
     setLastWin(bet);
-  }, [triggerHaptic]);
+
+    // Update demo balance on win
+    if (isDemoMode) {
+      const winnings = bet.stake * bet.multiplier;
+      setDemoBalance(prev => prev + winnings - bet.stake);
+    }
+  }, [triggerHaptic, isDemoMode]);
 
   // Handle bet loss
   const handleBetLost = useCallback((bet: TapBet) => {
     dispatch({ type: 'BET_LOST', payload: bet.id });
     triggerHaptic('error');
-  }, [triggerHaptic]);
+
+    // Update demo balance on loss
+    if (isDemoMode) {
+      setDemoBalance(prev => prev - bet.stake);
+    }
+  }, [triggerHaptic, isDemoMode]);
 
   // Clear last win
   const clearLastWin = useCallback(() => {
     setLastWin(null);
   }, []);
 
-  // Monitor bets
+  // Monitor bets for wins/losses
   useBetMonitor({
     bets: state.activeBets,
     currentPrice,
@@ -170,31 +191,22 @@ export function useTapTrading() {
     return PERP_ASSET_INDEXES[state.asset] ?? -1;
   }, [state.asset]);
 
-  // Place a bet - places actual perp order
+  // Place a bet - DEMO MODE works instantly, REAL MODE places actual order
   const placeBet = useCallback(async (box: GridBox): Promise<boolean> => {
+    console.log('placeBet called:', { box, isDemoMode, availableBalance, betAmount: state.betAmount });
+
     // Check if user has enough available balance
     if (availableBalance < state.betAmount) {
-      triggerHaptic('error');
-      return false;
-    }
-
-    // Check if wallet is connected
-    if (!walletClient) {
-      console.error('Wallet not connected');
-      triggerHaptic('error');
-      return false;
-    }
-
-    // Check if we have a valid asset index
-    if (assetIndex < 0) {
-      console.error('Invalid asset index for', state.asset);
+      console.log('Insufficient balance:', availableBalance, '<', state.betAmount);
       triggerHaptic('error');
       return false;
     }
 
     // Prevent double-placing
-    if (isPlacingOrder) return false;
-    setIsPlacingOrder(true);
+    if (isPlacingOrder) {
+      console.log('Already placing order');
+      return false;
+    }
 
     const bet: TapBet = {
       id: `bet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -209,27 +221,47 @@ export function useTapTrading() {
       status: 'active',
     };
 
+    // DEMO MODE - Instant bet placement, no wallet needed
+    if (isDemoMode) {
+      console.log('Demo mode - placing bet instantly:', bet);
+      dispatch({ type: 'PLACE_BET', payload: bet });
+      playSound('tap');
+      triggerHaptic('medium');
+      return true;
+    }
+
+    // REAL MODE - Requires wallet signature
+    if (!walletClient) {
+      console.error('Wallet not connected for real trading');
+      triggerHaptic('error');
+      return false;
+    }
+
+    if (assetIndex < 0) {
+      console.error('Invalid asset index for', state.asset);
+      triggerHaptic('error');
+      return false;
+    }
+
+    setIsPlacingOrder(true);
+
     try {
-      // Calculate position size: stake / current price * leverage (use 5x default)
       const leverage = 5;
       const positionSize = (state.betAmount * leverage) / currentPrice;
       const sizeStr = positionSize.toFixed(6);
 
-      // Create exchange client and place market order
       const exchangeClient = createExchangeClient(walletClient);
 
-      // Place a market order in the direction of the bet
       await placeOrder({
         exchangeClient,
         assetIndex,
         isBuy: box.direction === 'long',
-        price: currentPrice.toString(), // Will fill at market price
+        price: currentPrice.toString(),
         size: sizeStr,
         reduceOnly: false,
         orderType: 'market',
       });
 
-      // Add bet to state after successful order
       dispatch({ type: 'PLACE_BET', payload: bet });
       playSound('tap');
       triggerHaptic('medium');
@@ -243,7 +275,7 @@ export function useTapTrading() {
     } finally {
       setIsPlacingOrder(false);
     }
-  }, [availableBalance, state.betAmount, state.asset, currentPrice, triggerHaptic, walletClient, assetIndex, isPlacingOrder]);
+  }, [availableBalance, state.betAmount, state.asset, currentPrice, triggerHaptic, walletClient, assetIndex, isPlacingOrder, isDemoMode]);
 
   // Set bet amount
   const setBetAmount = useCallback((amount: number) => {
@@ -255,6 +287,16 @@ export function useTapTrading() {
     dispatch({ type: 'SET_ASSET', payload: asset });
   }, []);
 
+  // Toggle demo mode
+  const toggleDemoMode = useCallback(() => {
+    setIsDemoMode(prev => !prev);
+  }, []);
+
+  // Reset demo balance
+  const resetDemoBalance = useCallback(() => {
+    setDemoBalance(DEMO_STARTING_BALANCE);
+  }, []);
+
   return {
     // State
     asset: state.asset,
@@ -263,17 +305,23 @@ export function useTapTrading() {
     betAmount: state.betAmount,
     activeBets: state.activeBets,
     completedBets: state.completedBets,
-    balance: availableBalance, // Use available balance (real - staked)
+    balance: availableBalance,
     sessionPnL: state.sessionPnL,
     isConnected,
     gridBoxes,
     lastWin,
     isPlacingOrder,
 
+    // Demo mode
+    isDemoMode,
+    demoBalance,
+
     // Actions
     placeBet,
     setBetAmount,
     setAsset,
     clearLastWin,
+    toggleDemoMode,
+    resetDemoBalance,
   };
 }

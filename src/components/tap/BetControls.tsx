@@ -10,6 +10,7 @@ interface BetControlsProps {
   sessionPnL: number;
   activeBetsCount: number;
   onBetAmountChange: (amount: number) => void;
+  isDemoMode?: boolean;
 }
 
 export function BetControls({
@@ -18,15 +19,21 @@ export function BetControls({
   sessionPnL,
   activeBetsCount,
   onBetAmountChange,
+  isDemoMode = false,
 }: BetControlsProps) {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3 bg-black/90 border-t border-white/10 backdrop-blur-sm">
       {/* Balance - Left */}
-      <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-full">
-        <Wallet className="w-4 h-4 text-[#50E3C2]" />
-        <span className="font-mono font-bold text-white text-sm">
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-full ${
+        isDemoMode ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-white/5'
+      }`}>
+        <Wallet className={`w-4 h-4 ${isDemoMode ? 'text-yellow-400' : 'text-[#50E3C2]'}`} />
+        <span className={`font-mono font-bold text-sm ${isDemoMode ? 'text-yellow-400' : 'text-white'}`}>
           ${balance.toFixed(2)}
         </span>
+        {isDemoMode && (
+          <span className="text-[10px] text-yellow-500/70 uppercase font-medium">demo</span>
+        )}
       </div>
 
       {/* Bet amount selector - Center */}
