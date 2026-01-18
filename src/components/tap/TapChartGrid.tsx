@@ -11,20 +11,18 @@ interface TapChartGridProps {
   onTap: (box: GridBox) => void;
 }
 
-// Price increments by asset (for $0.50-style rows)
+// Euphoria-style config
 const PRICE_INCREMENTS: Record<string, number> = {
-  BTC: 5,      // $5 per row for BTC
-  ETH: 0.5,    // $0.50 per row for ETH
-  SOL: 0.02,   // $0.02 per row for SOL
-  DEFAULT: 0.01,
+  BTC: 2.5,     // $2.50 per row for fine movement
+  ETH: 0.25,
+  SOL: 0.01,
+  DEFAULT: 0.005,
 };
 
-// Time settings
-const HISTORY_SECONDS = 60;      // 60 seconds of history on left
-const FUTURE_SECONDS = 90;       // 90 seconds into future on right
-const TIME_SLOT_SECONDS = 5;     // Each column is 5 seconds
-const NUM_ROWS = 16;             // Price rows
-const NOW_POSITION = 0.35;       // "Now" line at 35% from left
+// Grid config - fewer, larger boxes like Euphoria
+const NUM_ROWS = 12;
+const NUM_COLS = 12;
+const COL_SECONDS = 5; // 5 seconds per column
 
 export const TapChartGrid = memo(function TapChartGrid({
   currentPrice,
@@ -37,18 +35,28 @@ export const TapChartGrid = memo(function TapChartGrid({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
 
-  const [priceZoom, setPriceZoom] = useState(1);
-  const [hoveredBox, setHoveredBox] = useState<{ row: number; col: number } | null>(null);
+  // Smooth price tracking
+  const smoothPriceRef = useRef(currentPrice);
+  const targetPriceRef = useRef(currentPrice);
 
-  // Price increment adjusted by zoom
+  const [priceZoom, setPriceZoom] = useState(1);
+  const [hoveredCell, setHoveredCell] = useState<{row: number, col: number} | null>(null);
+
+  // Update target price when current price changes
+  useEffect(() => {
+    if (currentPrice > 0) {
+      targetPriceRef.current = currentPrice;
+    }
+  }, [currentPrice]);
+
   const baseIncrement = PRICE_INCREMENTS[asset] || PRICE_INCREMENTS.DEFAULT;
   const increment = baseIncrement / priceZoom;
 
-  // Handle wheel zoom
+  // Wheel zoom
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const delta = e.ctrlKey ? -e.deltaY * 0.01 : -e.deltaY * 0.003;
-    setPriceZoom(prev => Math.max(0.3, Math.min(3, prev * (1 + delta))));
+    const delta = e.ctrlKey ? -e.deltaY * 0.01 : -e.deltaY * 0.002;
+    setPriceZoom(prev => Math.max(0.5, Math.min(4, prev * (1 + delta))));
   }, []);
 
   // Touch zoom
@@ -72,19 +80,16 @@ export const TapChartGrid = memo(function TapChartGrid({
         e.touches[0].clientY - e.touches[1].clientY
       );
       const scale = distance / touchRef.current.distance;
-      setPriceZoom(Math.max(0.3, Math.min(3, touchRef.current.zoom * scale)));
+      setPriceZoom(Math.max(0.5, Math.min(4, touchRef.current.zoom * scale)));
     }
   }, []);
 
-  // Event listeners
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
     container.addEventListener('wheel', handleWheel, { passive: false });
     container.addEventListener('touchstart', handleTouchStart, { passive: true });
     container.addEventListener('touchmove', handleTouchMove, { passive: false });
-
     return () => {
       container.removeEventListener('wheel', handleWheel);
       container.removeEventListener('touchstart', handleTouchStart);
@@ -92,11 +97,11 @@ export const TapChartGrid = memo(function TapChartGrid({
     };
   }, [handleWheel, handleTouchStart, handleTouchMove]);
 
-  // Main render loop
+  // Main animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container || !currentPrice) return;
+    if (!canvas || !container) return;
 
     const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
@@ -111,275 +116,282 @@ export const TapChartGrid = memo(function TapChartGrid({
 
     const width = rect.width;
     const height = rect.height;
-    const padding = { top: 10, right: 70, bottom: 30, left: 10 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
+    const priceAxisWidth = 65;
+    const timeAxisHeight = 25;
+    const chartW = width - priceAxisWidth;
+    const chartH = height - timeAxisHeight;
 
-    // Price range centered on current price
-    const halfRows = Math.floor(NUM_ROWS / 2);
-    const topPrice = Math.ceil(currentPrice / increment) * increment + halfRows * increment;
-    const bottomPrice = topPrice - NUM_ROWS * increment;
-    const priceRange = topPrice - bottomPrice;
+    const colW = chartW / NUM_COLS;
+    const rowH = chartH / NUM_ROWS;
 
-    const priceToY = (p: number) => {
-      return padding.top + ((topPrice - p) / priceRange) * chartHeight;
-    };
-
-    // Time calculations
-    const totalSeconds = HISTORY_SECONDS + FUTURE_SECONDS;
-    const nowX = padding.left + chartWidth * NOW_POSITION;
-    const pxPerSecond = chartWidth / totalSeconds;
-
-    const timeToX = (secondsFromNow: number) => {
-      return nowX + secondsFromNow * pxPerSecond;
-    };
-
-    // Calculate multiplier based on price distance and time
-    const calculateMultiplier = (priceLevel: number, futureSeconds: number) => {
-      const priceDist = Math.abs(priceLevel - currentPrice) / increment;
-      const distFactor = 1 + Math.pow(priceDist * 0.15, 1.4);
-      const timeFactor = 1 + (futureSeconds / 30) * 0.3;
-      const raw = distFactor * timeFactor;
-      return Math.max(1.1, Math.min(20, Math.round(raw * 100) / 100));
+    // Calculate multiplier
+    const getMultiplier = (rowDist: number, colIdx: number) => {
+      const priceFactor = 1 + Math.pow(rowDist * 0.12, 1.3);
+      const timeFactor = 1 + (colIdx * 0.08);
+      return Math.max(1.05, Math.min(15, priceFactor * timeFactor));
     };
 
     const draw = () => {
       const now = Date.now();
+
+      // Smooth price interpolation (lerp)
+      smoothPriceRef.current += (targetPriceRef.current - smoothPriceRef.current) * 0.08;
+      const displayPrice = smoothPriceRef.current;
+
+      if (!displayPrice || displayPrice <= 0) {
+        animationRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
+      // Price range centered on smooth price
+      const centerPrice = Math.round(displayPrice / increment) * increment;
+      const halfRows = NUM_ROWS / 2;
+      const topPrice = centerPrice + halfRows * increment;
+      const bottomPrice = centerPrice - halfRows * increment;
+      const priceRange = topPrice - bottomPrice;
+
+      const priceToY = (p: number) => ((topPrice - p) / priceRange) * chartH;
+      const yToPrice = (y: number) => topPrice - (y / chartH) * priceRange;
+
+      // Time reference - "now" is at 40% from left
+      const nowX = chartW * 0.4;
+      const pxPerSecond = chartW / (NUM_COLS * COL_SECONDS);
+      const timeToX = (secFromNow: number) => nowX + secFromNow * pxPerSecond;
+
       ctx.clearRect(0, 0, width, height);
 
-      // Background
-      ctx.fillStyle = '#0a0a0f';
+      // Dark background
+      ctx.fillStyle = '#08080c';
       ctx.fillRect(0, 0, width, height);
 
-      // Draw grid boxes (future only - right of "now" line)
-      const numFutureCols = Math.floor(FUTURE_SECONDS / TIME_SLOT_SECONDS);
-      const colWidth = (chartWidth * (1 - NOW_POSITION)) / numFutureCols;
-      const rowHeight = chartHeight / NUM_ROWS;
-
+      // Draw grid boxes
       for (let row = 0; row < NUM_ROWS; row++) {
-        const priceLevel = topPrice - row * increment;
-        const y = padding.top + row * rowHeight;
-        const isAbovePrice = priceLevel > currentPrice;
-        const isCurrentRow = Math.abs(priceLevel - currentPrice) < increment * 0.5;
+        const rowPrice = topPrice - (row + 0.5) * increment;
+        const y = row * rowH;
+        const isAbove = rowPrice > displayPrice;
+        const rowDist = Math.abs(row - (NUM_ROWS / 2 - 0.5));
 
-        for (let col = 0; col < numFutureCols; col++) {
-          const futureSeconds = (col + 1) * TIME_SLOT_SECONDS;
-          const x = nowX + col * colWidth;
+        for (let col = 0; col < NUM_COLS; col++) {
+          const x = col * colW;
+          const colCenterSec = (col - NUM_COLS * 0.4 + 0.5) * COL_SECONDS;
+          const isFuture = colCenterSec > 0;
+          const isPast = colCenterSec < -COL_SECONDS;
 
-          // Check if there's an active bet on this box
+          // Only show boxes that are in the future or very recent past
+          const opacity = isPast
+            ? Math.max(0, 1 + colCenterSec / (COL_SECONDS * 3)) * 0.3
+            : isFuture
+              ? Math.max(0.3, 1 - col / NUM_COLS * 0.5)
+              : 0.8;
+
+          if (opacity <= 0.05) continue;
+
+          const multiplier = getMultiplier(rowDist, Math.max(0, col - Math.floor(NUM_COLS * 0.4)));
+
+          // Check for active bet
           const bet = activeBets.find(b => {
-            const betTimeRemaining = (b.expiresAt - now) / 1000;
-            const colStart = col * TIME_SLOT_SECONDS;
-            const colEnd = (col + 1) * TIME_SLOT_SECONDS;
-            return Math.abs(b.targetPrice - priceLevel) < increment * 0.5 &&
-                   betTimeRemaining > colStart && betTimeRemaining <= colEnd;
+            const timeLeft = (b.expiresAt - now) / 1000;
+            const colStart = (col - NUM_COLS * 0.4) * COL_SECONDS;
+            const colEnd = colStart + COL_SECONDS;
+            return Math.abs(b.targetPrice - rowPrice) < increment * 0.6 &&
+                   timeLeft > colStart && timeLeft <= colEnd;
           });
 
           const isActive = bet?.status === 'active';
-          const isHovered = hoveredBox?.row === row && hoveredBox?.col === col;
-          const multiplier = calculateMultiplier(priceLevel, futureSeconds);
+          const isHovered = hoveredCell?.row === row && hoveredCell?.col === col && isFuture;
+          const isCurrentRow = Math.abs(rowPrice - displayPrice) < increment * 0.6;
 
-          // Box opacity fades towards right (further in future)
-          const fadeOpacity = 1 - (col / numFutureCols) * 0.3;
+          // Box colors
+          let bgColor: string;
+          let borderColor: string;
+          let textColor: string;
 
-          // Box fill
-          let fillColor: string;
           if (isActive) {
-            fillColor = 'rgba(250, 204, 21, 0.5)';
+            bgColor = `rgba(250, 204, 21, ${0.4 * opacity})`;
+            borderColor = `rgba(250, 204, 21, ${0.8 * opacity})`;
+            textColor = '#000';
           } else if (isCurrentRow) {
-            fillColor = 'rgba(80, 227, 194, 0.15)';
+            bgColor = `rgba(236, 72, 153, ${0.12 * opacity})`;
+            borderColor = `rgba(236, 72, 153, ${0.25 * opacity})`;
+            textColor = `rgba(236, 72, 153, ${opacity})`;
           } else if (isHovered) {
-            fillColor = isAbovePrice ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+            bgColor = isAbove
+              ? `rgba(34, 197, 94, ${0.25 * opacity})`
+              : `rgba(239, 68, 68, ${0.25 * opacity})`;
+            borderColor = isAbove
+              ? `rgba(34, 197, 94, ${0.5 * opacity})`
+              : `rgba(239, 68, 68, ${0.5 * opacity})`;
+            textColor = isAbove
+              ? `rgba(34, 197, 94, ${opacity})`
+              : `rgba(239, 68, 68, ${opacity})`;
           } else {
-            const baseAlpha = 0.08 * fadeOpacity;
-            fillColor = isAbovePrice
-              ? `rgba(34, 197, 94, ${baseAlpha})`
-              : `rgba(239, 68, 68, ${baseAlpha})`;
+            bgColor = isAbove
+              ? `rgba(34, 197, 94, ${0.06 * opacity})`
+              : `rgba(239, 68, 68, ${0.06 * opacity})`;
+            borderColor = isAbove
+              ? `rgba(34, 197, 94, ${0.15 * opacity})`
+              : `rgba(239, 68, 68, ${0.15 * opacity})`;
+            textColor = isAbove
+              ? `rgba(34, 197, 94, ${0.6 * opacity})`
+              : `rgba(239, 68, 68, ${0.6 * opacity})`;
           }
 
-          ctx.fillStyle = fillColor;
-          ctx.fillRect(x + 1, y + 1, colWidth - 2, rowHeight - 2);
-
-          // Box border
-          const borderAlpha = isActive ? 0.8 : 0.2 * fadeOpacity;
-          ctx.strokeStyle = isActive
-            ? 'rgba(250, 204, 21, 0.8)'
-            : isAbovePrice
-              ? `rgba(34, 197, 94, ${borderAlpha})`
-              : `rgba(239, 68, 68, ${borderAlpha})`;
+          // Draw box
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(x + 1, y + 1, colW - 2, rowH - 2);
+          ctx.strokeStyle = borderColor;
           ctx.lineWidth = isActive ? 2 : 1;
-          ctx.strokeRect(x + 1, y + 1, colWidth - 2, rowHeight - 2);
+          ctx.strokeRect(x + 1, y + 1, colW - 2, rowH - 2);
 
-          // Multiplier text
-          const textAlpha = 0.7 * fadeOpacity;
-          ctx.fillStyle = isActive
-            ? '#000'
-            : isAbovePrice
-              ? `rgba(34, 197, 94, ${textAlpha})`
-              : `rgba(239, 68, 68, ${textAlpha})`;
-          ctx.font = 'bold 10px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(`${multiplier.toFixed(2)}X`, x + colWidth / 2, y + rowHeight / 2);
+          // Multiplier text (only for future boxes with enough opacity)
+          if (opacity > 0.2 && isFuture) {
+            ctx.fillStyle = textColor;
+            ctx.font = `bold ${Math.min(11, rowH / 3)}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${multiplier.toFixed(2)}X`, x + colW / 2, y + rowH / 2);
 
-          // Time remaining for active bets
-          if (isActive && bet) {
-            const remaining = Math.max(0, Math.ceil((bet.expiresAt - now) / 1000));
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 8px monospace';
-            ctx.fillText(`${remaining}s`, x + colWidth / 2, y + rowHeight / 2 + 10);
+            // Show countdown for active bets
+            if (isActive && bet) {
+              const secs = Math.ceil((bet.expiresAt - now) / 1000);
+              ctx.fillStyle = '#000';
+              ctx.font = `bold 9px monospace`;
+              ctx.fillText(`${secs}s`, x + colW / 2, y + rowH / 2 + 12);
+            }
           }
         }
       }
 
-      // Draw price line (history + current)
-      if (priceHistory.length >= 2) {
-        // Sort by time and filter to visible range
-        const visibleHistory = priceHistory
-          .filter(p => (now - p.time) < HISTORY_SECONDS * 1000)
-          .sort((a, b) => a.time - b.time);
+      // Draw price line OVER boxes
+      const visibleHistory = priceHistory
+        .filter(p => (now - p.time) < 120000)
+        .sort((a, b) => a.time - b.time);
 
-        if (visibleHistory.length >= 2) {
-          // Gradient fill under line
-          const gradient = ctx.createLinearGradient(0, priceToY(currentPrice) - 50, 0, priceToY(currentPrice) + 50);
-          gradient.addColorStop(0, 'rgba(236, 72, 153, 0.3)');
-          gradient.addColorStop(0.5, 'rgba(236, 72, 153, 0.15)');
-          gradient.addColorStop(1, 'rgba(236, 72, 153, 0)');
+      if (visibleHistory.length >= 2) {
+        // Gradient under line
+        const gradient = ctx.createLinearGradient(0, priceToY(displayPrice) - 30, 0, priceToY(displayPrice) + 60);
+        gradient.addColorStop(0, 'rgba(236, 72, 153, 0.25)');
+        gradient.addColorStop(0.5, 'rgba(236, 72, 153, 0.1)');
+        gradient.addColorStop(1, 'rgba(236, 72, 153, 0)');
 
-          ctx.beginPath();
-          visibleHistory.forEach((point, i) => {
-            const age = (now - point.time) / 1000;
-            const x = timeToX(-age);
-            const y = priceToY(point.price);
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          });
-          // Close to bottom for fill
-          const lastX = timeToX(0);
-          ctx.lineTo(lastX, priceToY(currentPrice));
-          ctx.lineTo(lastX, chartHeight + padding.top);
-          ctx.lineTo(timeToX(-HISTORY_SECONDS), chartHeight + padding.top);
-          ctx.closePath();
-          ctx.fillStyle = gradient;
-          ctx.fill();
+        ctx.beginPath();
+        let firstX = 0, firstY = 0;
+        visibleHistory.forEach((p, i) => {
+          const age = (now - p.time) / 1000;
+          const x = timeToX(-age);
+          const y = priceToY(p.price);
+          if (i === 0) {
+            ctx.moveTo(x, y);
+            firstX = x;
+            firstY = y;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        // Extend to now position
+        ctx.lineTo(nowX, priceToY(displayPrice));
+        ctx.lineTo(nowX, chartH);
+        ctx.lineTo(firstX, chartH);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
 
-          // Price line
-          ctx.beginPath();
-          ctx.strokeStyle = '#ec4899';
-          ctx.lineWidth = 2.5;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.shadowColor = '#ec4899';
-          ctx.shadowBlur = 10;
+        // Main price line
+        ctx.beginPath();
+        ctx.strokeStyle = '#ec4899';
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = '#ec4899';
+        ctx.shadowBlur = 8;
 
-          visibleHistory.forEach((point, i) => {
-            const age = (now - point.time) / 1000;
-            const x = timeToX(-age);
-            const y = priceToY(point.price);
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          });
-          // Extend to "now"
-          ctx.lineTo(nowX, priceToY(currentPrice));
-          ctx.stroke();
-          ctx.shadowBlur = 0;
+        visibleHistory.forEach((p, i) => {
+          const age = (now - p.time) / 1000;
+          const x = timeToX(-age);
+          const y = priceToY(p.price);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(nowX, priceToY(displayPrice));
+        ctx.stroke();
+        ctx.shadowBlur = 0;
 
-          // Current price dot with glow
-          const pulse = 1 + Math.sin(now / 150) * 0.2;
-          const currentY = priceToY(currentPrice);
+        // Pulsing dot at current price
+        const pulse = 1 + Math.sin(now / 120) * 0.25;
+        const dotY = priceToY(displayPrice);
 
-          // Glow
-          ctx.beginPath();
-          ctx.arc(nowX, currentY, 10 * pulse, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(236, 72, 153, 0.4)';
-          ctx.fill();
+        ctx.beginPath();
+        ctx.arc(nowX, dotY, 8 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(236, 72, 153, 0.4)';
+        ctx.fill();
 
-          // Dot
-          ctx.beginPath();
-          ctx.arc(nowX, currentY, 5, 0, Math.PI * 2);
-          ctx.fillStyle = '#ec4899';
-          ctx.fill();
+        ctx.beginPath();
+        ctx.arc(nowX, dotY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ec4899';
+        ctx.shadowColor = '#ec4899';
+        ctx.shadowBlur = 12;
+        ctx.fill();
+        ctx.shadowBlur = 0;
 
-          // "Now" vertical line
-          ctx.beginPath();
-          ctx.strokeStyle = 'rgba(236, 72, 153, 0.3)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
-          ctx.moveTo(nowX, padding.top);
-          ctx.lineTo(nowX, height - padding.bottom);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
+        // Horizontal price line across grid
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(236, 72, 153, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.moveTo(0, dotY);
+        ctx.lineTo(chartW, dotY);
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
 
-      // Y-axis (right side) - Price labels
-      ctx.fillStyle = '#0a0a0f';
-      ctx.fillRect(width - padding.right, 0, padding.right, height);
+      // Right Y-axis (prices)
+      ctx.fillStyle = '#08080c';
+      ctx.fillRect(chartW, 0, priceAxisWidth, height);
 
       for (let row = 0; row <= NUM_ROWS; row++) {
-        const priceLevel = topPrice - row * increment;
-        const y = priceToY(priceLevel);
-        const isCurrentRow = Math.abs(priceLevel - currentPrice) < increment * 0.5;
+        const price = topPrice - row * increment;
+        const y = row * rowH;
+        const isCurrent = Math.abs(price - displayPrice) < increment * 0.6;
 
-        ctx.fillStyle = isCurrentRow ? '#ec4899' : '#666';
+        ctx.fillStyle = isCurrent ? '#ec4899' : '#555';
         ctx.font = '10px monospace';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-
-        const priceStr = priceLevel >= 1000
-          ? `$${priceLevel.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
-          : `$${priceLevel.toFixed(2)}`;
-        ctx.fillText(priceStr, width - padding.right + 5, y);
+        const priceStr = price >= 1000
+          ? `$${price.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}`
+          : `$${price.toFixed(2)}`;
+        ctx.fillText(priceStr, chartW + 4, y);
       }
 
       // Current price badge
-      const currentY = priceToY(currentPrice);
+      const badgeY = priceToY(displayPrice);
       ctx.fillStyle = '#ec4899';
       ctx.beginPath();
-      ctx.roundRect(width - padding.right + 2, currentY - 10, padding.right - 6, 20, 4);
+      ctx.roundRect(chartW + 2, badgeY - 9, priceAxisWidth - 6, 18, 3);
       ctx.fill();
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      const currentPriceStr = currentPrice >= 1000
-        ? `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`
-        : `$${currentPrice.toFixed(2)}`;
-      ctx.fillText(currentPriceStr, width - padding.right / 2, currentY);
+      const priceStr = displayPrice >= 1000
+        ? `$${displayPrice.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}`
+        : `$${displayPrice.toFixed(2)}`;
+      ctx.fillText(priceStr, chartW + priceAxisWidth / 2, badgeY);
 
-      // X-axis (bottom) - Time labels
-      ctx.fillStyle = '#0a0a0f';
-      ctx.fillRect(0, height - padding.bottom, width, padding.bottom);
+      // Bottom X-axis (time)
+      ctx.fillStyle = '#08080c';
+      ctx.fillRect(0, chartH, chartW, timeAxisHeight);
 
-      // Time markers
-      const timeMarkers = [];
-      for (let s = -HISTORY_SECONDS; s <= FUTURE_SECONDS; s += 15) {
-        timeMarkers.push(s);
-      }
+      for (let col = 0; col <= NUM_COLS; col += 2) {
+        const secFromNow = (col - NUM_COLS * 0.4) * COL_SECONDS;
+        const x = col * colW;
+        const t = new Date(now + secFromNow * 1000);
+        const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-      timeMarkers.forEach(s => {
-        const x = timeToX(s);
-        if (x < padding.left || x > width - padding.right) return;
-
-        const markerTime = new Date(now + s * 1000);
-        const timeStr = markerTime.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: true
-        }).toUpperCase();
-
-        ctx.fillStyle = s === 0 ? '#ec4899' : '#555';
+        ctx.fillStyle = Math.abs(secFromNow) < COL_SECONDS / 2 ? '#ec4899' : '#444';
         ctx.font = '9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(timeStr, x, height - 10);
-
-        // Tick mark
-        ctx.beginPath();
-        ctx.strokeStyle = s === 0 ? '#ec4899' : '#333';
-        ctx.moveTo(x, height - padding.bottom);
-        ctx.lineTo(x, height - padding.bottom + 5);
-        ctx.stroke();
-      });
+        ctx.fillText(timeStr, x, chartH + 14);
+      }
 
       animationRef.current = requestAnimationFrame(draw);
     };
@@ -387,14 +399,12 @@ export const TapChartGrid = memo(function TapChartGrid({
     draw();
 
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [currentPrice, priceHistory, activeBets, hoveredBox, increment, priceZoom, asset]);
+  }, [priceHistory, activeBets, hoveredCell, increment, priceZoom, asset]);
 
-  // Handle clicks
-  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Click handler
+  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const container = containerRef.current;
     if (!container || !currentPrice) return;
 
@@ -402,52 +412,49 @@ export const TapChartGrid = memo(function TapChartGrid({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const padding = { top: 10, right: 70, bottom: 30, left: 10 };
-    const chartWidth = rect.width - padding.left - padding.right;
-    const chartHeight = rect.height - padding.top - padding.bottom;
-    const nowX = padding.left + chartWidth * NOW_POSITION;
+    const priceAxisWidth = 65;
+    const timeAxisHeight = 25;
+    const chartW = rect.width - priceAxisWidth;
+    const chartH = rect.height - timeAxisHeight;
+    const colW = chartW / NUM_COLS;
+    const rowH = chartH / NUM_ROWS;
 
-    // Only clicks to the right of "now" line are valid
-    if (x < nowX || x > rect.width - padding.right || y < padding.top || y > rect.height - padding.bottom) {
-      return;
-    }
+    if (x >= chartW || y >= chartH) return;
 
-    const numFutureCols = Math.floor(FUTURE_SECONDS / TIME_SLOT_SECONDS);
-    const colWidth = (chartWidth * (1 - NOW_POSITION)) / numFutureCols;
-    const rowHeight = chartHeight / NUM_ROWS;
+    const col = Math.floor(x / colW);
+    const row = Math.floor(y / rowH);
 
-    const col = Math.floor((x - nowX) / colWidth);
-    const row = Math.floor((y - padding.top) / rowHeight);
+    // Only future columns are tappable (col > 40% of columns)
+    const futureStartCol = Math.floor(NUM_COLS * 0.4);
+    if (col < futureStartCol) return;
 
-    if (col >= 0 && col < numFutureCols && row >= 0 && row < NUM_ROWS) {
-      const halfRows = Math.floor(NUM_ROWS / 2);
-      const topPrice = Math.ceil(currentPrice / increment) * increment + halfRows * increment;
-      const priceLevel = topPrice - row * increment;
-      const futureSeconds = (col + 1) * TIME_SLOT_SECONDS;
-      const isLong = priceLevel > currentPrice;
+    const centerPrice = Math.round(currentPrice / increment) * increment;
+    const halfRows = NUM_ROWS / 2;
+    const topPrice = centerPrice + halfRows * increment;
+    const rowPrice = topPrice - (row + 0.5) * increment;
 
-      // Calculate multiplier
-      const priceDist = Math.abs(priceLevel - currentPrice) / increment;
-      const distFactor = 1 + Math.pow(priceDist * 0.15, 1.4);
-      const timeFactor = 1 + (futureSeconds / 30) * 0.3;
-      const multiplier = Math.max(1.1, Math.min(20, Math.round(distFactor * timeFactor * 100) / 100));
+    const colIdx = col - futureStartCol;
+    const timeWindow = (colIdx + 1) * COL_SECONDS;
+    const rowDist = Math.abs(row - (NUM_ROWS / 2 - 0.5));
+    const priceFactor = 1 + Math.pow(rowDist * 0.12, 1.3);
+    const timeFactor = 1 + (colIdx * 0.08);
+    const multiplier = Math.max(1.05, Math.min(15, priceFactor * timeFactor));
 
-      const box: GridBox = {
-        id: `${row}-${col}`,
-        row,
-        col,
-        price: priceLevel,
-        timeWindow: futureSeconds,
-        multiplier,
-        direction: isLong ? 'long' : 'short',
-      };
+    const box: GridBox = {
+      id: `${row}-${col}`,
+      row,
+      col,
+      price: rowPrice,
+      timeWindow,
+      multiplier,
+      direction: rowPrice > currentPrice ? 'long' : 'short',
+    };
 
-      onTap(box);
-    }
+    onTap(box);
   }, [currentPrice, increment, onTap]);
 
-  // Handle hover
-  const handleCanvasMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Hover handler
+  const handleMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -455,52 +462,49 @@ export const TapChartGrid = memo(function TapChartGrid({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const padding = { top: 10, right: 70, bottom: 30, left: 10 };
-    const chartWidth = rect.width - padding.left - padding.right;
-    const chartHeight = rect.height - padding.top - padding.bottom;
-    const nowX = padding.left + chartWidth * NOW_POSITION;
+    const priceAxisWidth = 65;
+    const timeAxisHeight = 25;
+    const chartW = rect.width - priceAxisWidth;
+    const chartH = rect.height - timeAxisHeight;
+    const colW = chartW / NUM_COLS;
+    const rowH = chartH / NUM_ROWS;
 
-    if (x < nowX || x > rect.width - padding.right || y < padding.top || y > rect.height - padding.bottom) {
-      setHoveredBox(null);
+    if (x >= chartW || y >= chartH) {
+      setHoveredCell(null);
       return;
     }
 
-    const numFutureCols = Math.floor(FUTURE_SECONDS / TIME_SLOT_SECONDS);
-    const colWidth = (chartWidth * (1 - NOW_POSITION)) / numFutureCols;
-    const rowHeight = chartHeight / NUM_ROWS;
+    const col = Math.floor(x / colW);
+    const row = Math.floor(y / rowH);
+    const futureStartCol = Math.floor(NUM_COLS * 0.4);
 
-    const col = Math.floor((x - nowX) / colWidth);
-    const row = Math.floor((y - padding.top) / rowHeight);
-
-    if (col >= 0 && col < numFutureCols && row >= 0 && row < NUM_ROWS) {
-      setHoveredBox({ row, col });
+    if (col >= futureStartCol && col < NUM_COLS && row >= 0 && row < NUM_ROWS) {
+      setHoveredCell({ row, col });
     } else {
-      setHoveredBox(null);
+      setHoveredCell(null);
     }
   }, []);
 
   if (!currentPrice) {
     return (
-      <div className="flex items-center justify-center h-full bg-[#0a0a0f]">
-        <div className="text-gray-500 animate-pulse">Connecting to price feed...</div>
+      <div className="flex items-center justify-center h-full bg-[#08080c]">
+        <div className="text-gray-500 animate-pulse">Connecting...</div>
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-[#0a0a0f] overflow-hidden select-none">
-      {/* Zoom indicator */}
-      <div className="absolute top-2 right-20 z-10 flex items-center gap-2 bg-black/60 backdrop-blur rounded px-2 py-1 text-xs">
+    <div ref={containerRef} className="relative w-full h-full bg-[#08080c] overflow-hidden select-none">
+      <div className="absolute top-2 right-16 z-10 text-xs bg-black/60 px-2 py-1 rounded flex items-center gap-2">
         <span className="text-gray-500">Zoom</span>
-        <span className="font-mono text-[#ec4899]">{priceZoom.toFixed(1)}x</span>
+        <span className="text-[#ec4899] font-mono">{priceZoom.toFixed(1)}x</span>
       </div>
-
       <canvas
         ref={canvasRef}
         className="absolute inset-0 cursor-crosshair"
-        onClick={handleCanvasClick}
-        onMouseMove={handleCanvasMove}
-        onMouseLeave={() => setHoveredBox(null)}
+        onClick={handleClick}
+        onMouseMove={handleMove}
+        onMouseLeave={() => setHoveredCell(null)}
       />
     </div>
   );
