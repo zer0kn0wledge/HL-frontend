@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useTapTrading } from '@/hooks/tap/useTapTrading';
 import { TapHeader } from './TapHeader';
 import { AssetSelector } from './AssetSelector';
 import { TapChartGrid } from './TapChartGrid';
 import { BetControls } from './BetControls';
 import { WinCelebration } from './WinCelebration';
-import { TapDepositModal } from './TapDepositModal';
 import { GridBox } from '@/lib/tap/types';
-import { Wallet } from 'lucide-react';
+import { Wallet, AlertCircle } from 'lucide-react';
 
 export function TapTradingView() {
   const {
@@ -28,53 +26,15 @@ export function TapTradingView() {
     clearLastWin,
     // Demo mode
     isDemoMode,
-    demoBalance,
     toggleDemoMode,
     resetDemoBalance,
-    // Real mode
-    tapTradingBalance,
+    // Real balance
     realBalance,
-    depositTapBalance,
+    isPlacingOrder,
   } = useTapTrading();
 
-  // Show deposit modal on first load if in real mode with no balance
-  const [showDepositModal, setShowDepositModal] = useState(() => {
-    // Check if we should show on mount (real mode with no balance)
-    return true; // Will be controlled by useEffect
-  });
-  const [hasShownInitialModal, setHasShownInitialModal] = useState(false);
-
-  // Show deposit modal on first load or when switching to real mode with no balance
-  useEffect(() => {
-    if (!isDemoMode && tapTradingBalance === 0 && !hasShownInitialModal) {
-      setShowDepositModal(true);
-      setHasShownInitialModal(true);
-    }
-  }, [isDemoMode, tapTradingBalance, hasShownInitialModal]);
-
   const handleTap = (box: GridBox) => {
-    // If in real mode with no balance, show deposit modal
-    if (!isDemoMode && tapTradingBalance < betAmount) {
-      setShowDepositModal(true);
-      return;
-    }
     placeBet(box);
-  };
-
-  const handleToggleMode = () => {
-    // If switching to real mode with no balance, show deposit modal
-    if (isDemoMode && tapTradingBalance === 0) {
-      setShowDepositModal(true);
-    }
-    toggleDemoMode();
-  };
-
-  const handleDeposit = (amount: number) => {
-    depositTapBalance(amount);
-    // If we were in demo mode, switch to real mode
-    if (isDemoMode) {
-      toggleDemoMode();
-    }
   };
 
   return (
@@ -94,7 +54,7 @@ export function TapTradingView() {
       {/* Mode toggle and balance - floating top right */}
       <div className="absolute top-16 right-4 z-30 flex items-center gap-2">
         <button
-          onClick={handleToggleMode}
+          onClick={toggleDemoMode}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
             isDemoMode
               ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
@@ -113,14 +73,13 @@ export function TapTradingView() {
             Reset
           </button>
         ) : (
-          <button
-            onClick={() => setShowDepositModal(true)}
-            className="px-2 py-1.5 rounded-lg text-xs text-green-400 hover:text-green-300 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 transition-all flex items-center gap-1"
-            title="Deposit funds for tap trading"
-          >
-            <Wallet className="w-3 h-3" />
-            {tapTradingBalance > 0 ? `$${tapTradingBalance.toFixed(0)}` : 'Deposit'}
-          </button>
+          <div className="px-3 py-1.5 rounded-lg text-sm bg-white/5 border border-white/10 flex items-center gap-2">
+            <Wallet className="w-3.5 h-3.5 text-green-400" />
+            <span className="font-mono font-bold text-green-400">
+              ${realBalance.toFixed(2)}
+            </span>
+            <span className="text-[10px] text-gray-500">HL</span>
+          </div>
         )}
       </div>
 
@@ -134,29 +93,38 @@ export function TapTradingView() {
           onTap={handleTap}
         />
 
-        {/* Overlay prompt for real mode with no balance */}
-        {!isDemoMode && tapTradingBalance < betAmount && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-20">
-            <div className="text-center p-6">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-                <Wallet className="w-8 h-8 text-green-400" />
+        {/* Overlay for real mode with no balance */}
+        {!isDemoMode && realBalance < betAmount && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-20">
+            <div className="text-center p-6 max-w-sm">
+              <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-red-400" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Deposit Funds to Trade</h3>
-              <p className="text-gray-400 mb-4 max-w-xs">
-                Pre-approve funds to enable instant tap trading without wallet popups.
+              <h3 className="text-xl font-bold text-white mb-2">Insufficient Balance</h3>
+              <p className="text-gray-400 mb-4">
+                You need at least ${betAmount} in your Hyperliquid account to place bets.
+                Current balance: <span className="text-white font-mono">${realBalance.toFixed(2)}</span>
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                Deposit USDC to your Hyperliquid perps account to start trading.
               </p>
               <button
-                onClick={() => setShowDepositModal(true)}
-                className="px-6 py-3 bg-green-500 hover:bg-green-400 text-white font-bold rounded-xl transition-all"
-              >
-                Deposit Now
-              </button>
-              <button
                 onClick={toggleDemoMode}
-                className="block mx-auto mt-3 text-sm text-gray-500 hover:text-gray-400"
+                className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl transition-all"
               >
-                or continue in demo mode
+                Try Demo Mode Instead
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Loading overlay when placing order */}
+        {isPlacingOrder && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-30">
+            <div className="text-center p-6">
+              <div className="w-12 h-12 border-4 border-[#ec4899]/30 border-t-[#ec4899] rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-white font-medium">Placing order on Hyperliquid...</p>
+              <p className="text-gray-400 text-sm mt-1">Please confirm in your wallet</p>
             </div>
           </div>
         )}
@@ -174,14 +142,6 @@ export function TapTradingView() {
 
       {/* Win celebration overlay */}
       <WinCelebration bet={lastWin} onComplete={clearLastWin} />
-
-      {/* Deposit modal */}
-      <TapDepositModal
-        isOpen={showDepositModal}
-        onClose={() => setShowDepositModal(false)}
-        onDeposit={handleDeposit}
-        currentBalance={tapTradingBalance}
-      />
     </div>
   );
 }

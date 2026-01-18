@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Wallet, Zap, AlertCircle, CheckCircle } from 'lucide-react';
-import { useWalletClient, useAccount } from 'wagmi';
-import { useUserStore } from '@/store';
-import BigNumber from 'bignumber.js';
+import { X, Wallet, Zap, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { useAccount } from 'wagmi';
 
 interface TapDepositModalProps {
   isOpen: boolean;
@@ -27,22 +25,11 @@ export function TapDepositModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const { isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const { accountState } = useUserStore();
-
-  const availableBalance = new BigNumber(
-    accountState?.marginSummary?.withdrawable || '0'
-  ).toNumber();
+  const { isConnected, address } = useAccount();
 
   const handleDeposit = async () => {
-    if (!isConnected || !walletClient) {
+    if (!isConnected) {
       setError('Please connect your wallet first');
-      return;
-    }
-
-    if (amount > availableBalance) {
-      setError(`Insufficient balance. You have $${availableBalance.toFixed(2)} available.`);
       return;
     }
 
@@ -51,14 +38,20 @@ export function TapDepositModal({
       return;
     }
 
+    if (amount > 10000) {
+      setError('Maximum deposit is $10,000');
+      return;
+    }
+
     setIsDepositing(true);
     setError(null);
 
     try {
-      // For now, just simulate the deposit
-      // In production, this would interact with a smart contract
-      // to lock funds for tap trading
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Simulate deposit process
+      // In production, this would:
+      // 1. Transfer USDC from wallet to tap trading contract
+      // 2. Lock funds for instant tap trading
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       setSuccess(true);
       onDeposit(amount);
@@ -67,7 +60,7 @@ export function TapDepositModal({
       setTimeout(() => {
         onClose();
         setSuccess(false);
-      }, 2000);
+      }, 1500);
     } catch (err) {
       setError('Failed to deposit. Please try again.');
       console.error('Deposit error:', err);
@@ -115,7 +108,7 @@ export function TapDepositModal({
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-white">Tap Trading Deposit</h2>
-                    <p className="text-xs text-gray-400">Pre-approve funds for instant trading</p>
+                    <p className="text-xs text-gray-400">Allocate funds for instant trading</p>
                   </div>
                 </div>
                 <button
@@ -131,28 +124,30 @@ export function TapDepositModal({
                 {/* Info box */}
                 <div className="bg-[#ec4899]/10 border border-[#ec4899]/20 rounded-xl p-3">
                   <p className="text-sm text-[#ec4899]">
-                    Deposit funds to enable instant tap trading without wallet confirmations.
-                    Funds are locked for tap trading only.
+                    Allocate funds to enable instant tap trading.
+                    Tap boxes to bet on price direction and win multiplied returns!
                   </p>
                 </div>
 
-                {/* Current balance */}
-                <div className="flex items-center justify-between bg-white/5 rounded-xl p-3">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-400">Available Balance</span>
+                {/* Connected wallet */}
+                {isConnected && address && (
+                  <div className="flex items-center justify-between bg-white/5 rounded-xl p-3">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-green-400" />
+                      <span className="text-sm text-gray-400">Connected</span>
+                    </div>
+                    <span className="font-mono text-sm text-green-400">
+                      {address.slice(0, 6)}...{address.slice(-4)}
+                    </span>
                   </div>
-                  <span className="font-mono font-bold text-white">
-                    ${availableBalance.toFixed(2)}
-                  </span>
-                </div>
+                )}
 
-                {/* Tap trading balance */}
+                {/* Current tap trading balance */}
                 {currentBalance > 0 && (
                   <div className="flex items-center justify-between bg-green-500/10 border border-green-500/20 rounded-xl p-3">
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-green-400" />
-                      <span className="text-sm text-green-400">Tap Trading Balance</span>
+                      <span className="text-sm text-green-400">Current Tap Balance</span>
                     </div>
                     <span className="font-mono font-bold text-green-400">
                       ${currentBalance.toFixed(2)}
@@ -162,7 +157,7 @@ export function TapDepositModal({
 
                 {/* Amount input */}
                 <div className="space-y-2">
-                  <label className="text-sm text-gray-400">Deposit Amount</label>
+                  <label className="text-sm text-gray-400">Deposit Amount (USDC)</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">$</span>
                     <input
@@ -171,7 +166,7 @@ export function TapDepositModal({
                       onChange={(e) => setAmount(Number(e.target.value))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-xl font-mono font-bold text-white focus:outline-none focus:border-[#ec4899]/50 focus:ring-1 focus:ring-[#ec4899]/50"
                       min={10}
-                      max={availableBalance}
+                      max={10000}
                     />
                   </div>
                 </div>
@@ -193,13 +188,14 @@ export function TapDepositModal({
                   ))}
                 </div>
 
-                {/* Max button */}
-                <button
-                  onClick={() => setAmount(Math.floor(availableBalance))}
-                  className="w-full py-2 rounded-lg text-sm font-medium text-[#ec4899] hover:bg-[#ec4899]/10 transition-colors"
-                >
-                  Use Max Balance (${Math.floor(availableBalance)})
-                </button>
+                {/* Note about simulation */}
+                <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
+                  <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-400">
+                    Tap trading uses simulated execution. Your deposited balance tracks wins/losses
+                    based on real BTC price movements. Full Hyperliquid integration coming soon!
+                  </p>
+                </div>
 
                 {/* Error message */}
                 {error && (
@@ -214,7 +210,7 @@ export function TapDepositModal({
                   <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
                     <CheckCircle className="w-4 h-4 text-green-400" />
                     <span className="text-sm text-green-400">
-                      Successfully deposited ${amount} for tap trading!
+                      Successfully allocated ${amount} for tap trading!
                     </span>
                   </div>
                 )}
@@ -234,22 +230,22 @@ export function TapDepositModal({
                   {isDepositing ? (
                     <span className="flex items-center justify-center gap-2">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Depositing...
+                      Allocating...
                     </span>
                   ) : success ? (
                     <span className="flex items-center justify-center gap-2">
                       <CheckCircle className="w-4 h-4" />
-                      Deposited!
+                      Done!
                     </span>
                   ) : !isConnected ? (
                     'Connect Wallet First'
                   ) : (
-                    `Deposit $${amount} for Tap Trading`
+                    `Allocate $${amount} for Tap Trading`
                   )}
                 </button>
 
                 <p className="text-xs text-gray-500 text-center mt-3">
-                  You can withdraw unused funds at any time
+                  Balance persists locally. Wins and losses are tracked against real price.
                 </p>
               </div>
             </div>
