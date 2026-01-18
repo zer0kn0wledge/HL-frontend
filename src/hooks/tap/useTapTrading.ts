@@ -17,9 +17,6 @@ import BigNumber from 'bignumber.js';
 // Demo mode starting balance
 const DEMO_STARTING_BALANCE = 1000;
 
-// Local storage key for tap trading balance
-const TAP_BALANCE_KEY = 'tap-trading-balance';
-
 const initialState: TapTradingState = {
   asset: 'BTC',
   currentPrice: 0,
@@ -101,26 +98,10 @@ export function useTapTrading() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoBalance, setDemoBalance] = useState(DEMO_STARTING_BALANCE);
 
-  // Tap trading balance for real mode (pre-approved funds)
-  const [tapTradingBalance, setTapTradingBalance] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(TAP_BALANCE_KEY);
-      return stored ? parseFloat(stored) : 0;
-    }
-    return 0;
-  });
-
-  // Persist tap trading balance
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(TAP_BALANCE_KEY, tapTradingBalance.toString());
-    }
-  }, [tapTradingBalance]);
-
-  // Get wallet client for signing orders (real mode only)
+  // Get wallet client for signing orders
   const { data: walletClient } = useWalletClient();
 
-  // Get real balance from user store
+  // Get REAL balance from Hyperliquid account
   const { accountState } = useUserStore();
   const realBalance = useMemo(() => {
     const withdrawable = accountState?.marginSummary?.withdrawable || '0';
@@ -132,11 +113,10 @@ export function useTapTrading() {
     return state.activeBets.reduce((sum, bet) => sum + bet.stake, 0);
   }, [state.activeBets]);
 
-  // Available balance depends on mode
-  // In real mode, use the tap trading balance (pre-approved funds)
+  // Available balance - USE REAL HL BALANCE in real mode
   const availableBalance = isDemoMode
     ? demoBalance - totalStaked
-    : tapTradingBalance - totalStaked;
+    : realBalance - totalStaked;
 
   // Price stream
   const { currentPrice, priceHistory, isConnected } = usePriceStream({
@@ -154,7 +134,7 @@ export function useTapTrading() {
     dispatch({ type: 'SET_CONNECTED', payload: isConnected });
   }, [isConnected]);
 
-  // Sync balance to state based on mode
+  // Sync balance to state
   useEffect(() => {
     const balance = isDemoMode ? demoBalance : realBalance;
     if (balance !== state.balance) {
@@ -175,14 +155,11 @@ export function useTapTrading() {
     playSound('win');
     setLastWin(bet);
 
-    const winnings = bet.stake * bet.multiplier;
-    const profit = winnings - bet.stake;
-
-    // Update balance based on mode
+    // Only update demo balance manually (real balance updates from HL)
     if (isDemoMode) {
+      const winnings = bet.stake * bet.multiplier;
+      const profit = winnings - bet.stake;
       setDemoBalance(prev => prev + profit);
-    } else {
-      setTapTradingBalance(prev => prev + profit);
     }
   }, [triggerHaptic, isDemoMode]);
 
@@ -191,11 +168,9 @@ export function useTapTrading() {
     dispatch({ type: 'BET_LOST', payload: bet.id });
     triggerHaptic('error');
 
-    // Update balance based on mode
+    // Only update demo balance manually (real balance updates from HL)
     if (isDemoMode) {
       setDemoBalance(prev => prev - bet.stake);
-    } else {
-      setTapTradingBalance(prev => prev - bet.stake);
     }
   }, [triggerHaptic, isDemoMode]);
 
@@ -217,11 +192,9 @@ export function useTapTrading() {
     return PERP_ASSET_INDEXES[state.asset] ?? -1;
   }, [state.asset]);
 
-  // Place a bet - Both modes now use instant placement with pre-approved funds
-  // DEMO: Uses demo balance
-  // REAL: Uses tap trading balance (pre-deposited funds)
+  // Place a bet - DEMO mode simulates, REAL mode places actual HL orders
   const placeBet = useCallback(async (box: GridBox): Promise<boolean> => {
-    console.log('placeBet called:', { box, isDemoMode, availableBalance, betAmount: state.betAmount });
+    console.log('placeBet called:', { box, isDemoMode, availableBalance, betAmount: state.betAmount, realBalance });
 
     // Check if user has enough available balance
     if (availableBalance < state.betAmount) {
@@ -250,15 +223,68 @@ export function useTapTrading() {
       status: 'active',
     };
 
-    // Both DEMO and REAL modes now use instant placement
-    // Real mode uses pre-deposited tap trading balance
-    // (Future: integrate with Hyperliquid session keys for actual order execution)
-    console.log(`${isDemoMode ? 'Demo' : 'Real'} mode - placing bet:`, bet);
-    dispatch({ type: 'PLACE_BET', payload: bet });
-    playSound('tap');
-    triggerHaptic('medium');
-    return true;
-  }, [availableBalance, state.betAmount, state.asset, currentPrice, triggerHaptic, isPlacingOrder, isDemoMode]);
+    // DEMO MODE - Instant simulated placement
+    if (isDemoMode) {
+      console.log('Demo mode - placing simulated bet:', bet);
+      dispatch({ type: 'PLACE_BET', payload: bet });
+      playSound('tap');
+      triggerHaptic('medium');
+      return true;
+    }
+
+    // REAL MODE - Place actual order on Hyperliquid
+    if (!walletClient) {
+      console.error('Wallet not connected');
+      triggerHaptic('error');
+      return false;
+    }
+
+    if (assetIndex < 0) {
+      console.error('Invalid asset index for', state.asset);
+      triggerHaptic('error');
+      return false;
+    }
+
+    setIsPlacingOrder(true);
+
+    try {
+      // Calculate position size based on bet amount and leverage
+      const leverage = 5; // 5x leverage for tap trading
+      const positionSize = (state.betAmount * leverage) / currentPrice;
+      const sizeStr = positionSize.toFixed(6);
+
+      console.log(`Placing REAL ${box.direction} order: ${sizeStr} ${state.asset} @ market`);
+
+      const exchangeClient = createExchangeClient(walletClient);
+
+      // Place market order on Hyperliquid
+      const result = await placeOrder({
+        exchangeClient,
+        assetIndex,
+        isBuy: box.direction === 'long',
+        price: currentPrice.toString(),
+        size: sizeStr,
+        reduceOnly: false,
+        orderType: 'market',
+      });
+
+      console.log('Order placed successfully:', result);
+
+      // Track the bet
+      dispatch({ type: 'PLACE_BET', payload: bet });
+      playSound('tap');
+      triggerHaptic('medium');
+
+      return true;
+    } catch (error) {
+      console.error('Failed to place order:', error);
+      triggerHaptic('error');
+      playSound('lose');
+      return false;
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  }, [availableBalance, state.betAmount, state.asset, currentPrice, triggerHaptic, walletClient, assetIndex, isPlacingOrder, isDemoMode, realBalance]);
 
   // Set bet amount
   const setBetAmount = useCallback((amount: number) => {
@@ -280,16 +306,6 @@ export function useTapTrading() {
     setDemoBalance(DEMO_STARTING_BALANCE);
   }, []);
 
-  // Deposit to tap trading balance (for real mode)
-  const depositTapBalance = useCallback((amount: number) => {
-    setTapTradingBalance(prev => prev + amount);
-  }, []);
-
-  // Withdraw from tap trading balance
-  const withdrawTapBalance = useCallback((amount: number) => {
-    setTapTradingBalance(prev => Math.max(0, prev - amount));
-  }, []);
-
   return {
     // State
     asset: state.asset,
@@ -309,8 +325,7 @@ export function useTapTrading() {
     isDemoMode,
     demoBalance,
 
-    // Tap trading balance (for real mode)
-    tapTradingBalance,
+    // Real balance from Hyperliquid
     realBalance,
 
     // Actions
@@ -320,7 +335,5 @@ export function useTapTrading() {
     clearLastWin,
     toggleDemoMode,
     resetDemoBalance,
-    depositTapBalance,
-    withdrawTapBalance,
   };
 }
