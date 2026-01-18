@@ -14,10 +14,11 @@ interface TapChartGridProps {
 }
 
 // Time columns in seconds - more granular
-const TIME_COLUMNS = [3, 5, 10, 15, 20, 30, 45, 60];
-const NUM_ROWS = 16; // More rows for finer price granularity
-const MIN_ZOOM = 0.2;
-const MAX_ZOOM = 10;
+const TIME_COLUMNS = [5, 10, 15, 30, 45, 60, 90, 120];
+const NUM_ROWS = 12; // Balanced rows for clear visibility
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 5;
+const CHART_WIDTH_PERCENT = 0.25; // Price chart takes 25% of width
 
 export const TapChartGrid = memo(function TapChartGrid({
   currentPrice,
@@ -32,7 +33,7 @@ export const TapChartGrid = memo(function TapChartGrid({
   const animationRef = useRef<number | undefined>(undefined);
 
   // Zoom state - continuous, not presets
-  const [priceZoom, setPriceZoom] = useState(3);
+  const [priceZoom, setPriceZoom] = useState(1.5);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartY, setDragStartY] = useState(0);
   const [dragStartZoom, setDragStartZoom] = useState(3);
@@ -238,13 +239,13 @@ export const TapChartGrid = memo(function TapChartGrid({
       const visibleHistory = priceHistory.filter(p => now - p.time < historyWindowMs);
 
       if (visibleHistory.length >= 2) {
-        // Price line position - left portion of screen
-        const lineEndX = canvas.width * 0.08;
+        // Price line fills entire chart area - current price at right edge
+        const lineEndX = canvas.width - 10; // Leave 10px margin at right
 
         // Draw gradient fill
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, 'rgba(80, 227, 194, 0.08)');
-        gradient.addColorStop(0.5, 'rgba(80, 227, 194, 0.03)');
+        gradient.addColorStop(0, 'rgba(80, 227, 194, 0.15)');
+        gradient.addColorStop(0.5, 'rgba(80, 227, 194, 0.08)');
         gradient.addColorStop(1, 'rgba(80, 227, 194, 0)');
 
         ctx.beginPath();
@@ -264,11 +265,11 @@ export const TapChartGrid = memo(function TapChartGrid({
         // Draw price line
         ctx.beginPath();
         ctx.strokeStyle = '#50E3C2';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.shadowColor = '#50E3C2';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
 
         visibleHistory.forEach((point, i) => {
           const age = now - point.time;
@@ -279,26 +280,24 @@ export const TapChartGrid = memo(function TapChartGrid({
         });
         ctx.stroke();
 
-        // Current price indicator
+        // Current price indicator - pulsing dot at line end
         const lastPoint = visibleHistory[visibleHistory.length - 1];
         const y = priceToY(lastPoint.price);
-        const pulse = 1 + Math.sin(Date.now() / 150) * 0.2;
+        const pulse = 1 + Math.sin(Date.now() / 150) * 0.3;
 
+        // Outer glow
         ctx.beginPath();
-        ctx.arc(lineEndX, y, 5 * pulse, 0, Math.PI * 2);
-        ctx.fillStyle = '#50E3C2';
-        ctx.shadowBlur = 15 * pulse;
+        ctx.arc(lineEndX, y, 8 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(80, 227, 194, 0.3)';
+        ctx.shadowBlur = 20;
         ctx.fill();
 
-        // Horizontal line at current price
+        // Inner dot
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(80, 227, 194, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.moveTo(lineEndX, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.arc(lineEndX, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#50E3C2';
+        ctx.shadowBlur = 0;
+        ctx.fill();
       }
 
       animationRef.current = requestAnimationFrame(draw);
@@ -342,13 +341,13 @@ export const TapChartGrid = memo(function TapChartGrid({
 
       {/* Instructions */}
       <div className="absolute top-2 left-16 z-30 text-[9px] text-gray-600">
-        Pinch/scroll to zoom • Drag Y-axis to adjust
+        Pinch/scroll to zoom • Drag Y-axis
       </div>
 
       <div className="flex-1 flex min-h-0">
         {/* Y-Axis - draggable for zoom */}
         <div
-          className={`w-14 flex flex-col shrink-0 cursor-ns-resize ${isDragging ? 'bg-[#50E3C2]/10' : ''}`}
+          className={`w-12 flex flex-col shrink-0 cursor-ns-resize border-r border-white/10 ${isDragging ? 'bg-[#50E3C2]/10' : ''}`}
           onMouseDown={handleYAxisMouseDown}
         >
           {priceLevels.map((price, i) => {
@@ -357,7 +356,7 @@ export const TapChartGrid = memo(function TapChartGrid({
             return (
               <div
                 key={`price-${i}`}
-                className={`flex-1 flex items-center justify-end pr-1 text-[9px] font-mono border-b border-white/5 ${
+                className={`flex-1 flex items-center justify-end pr-1 text-[9px] font-mono ${
                   isCurrent ? 'bg-[#50E3C2]/20 text-[#50E3C2]' : ''
                 }`}
                 style={{ color: isCurrent ? '#50E3C2' : isAbove ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)' }}
@@ -369,10 +368,33 @@ export const TapChartGrid = memo(function TapChartGrid({
           <div className="h-6 shrink-0" />
         </div>
 
-        {/* Grid */}
-        <div className="flex-1 flex flex-col relative min-w-0">
+        {/* Chart area - shows price history */}
+        <div
+          ref={gridRef}
+          className="relative shrink-0 border-r border-white/10"
+          style={{ width: '20%' }}
+        >
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0"
+          />
+          {/* Current price label */}
+          <div className="absolute right-0 text-[8px] font-mono text-[#50E3C2] bg-[#50E3C2]/20 px-1 rounded-l"
+            style={{
+              top: `${((priceLevels[0] - currentPrice) / (priceLevels[0] - priceLevels[priceLevels.length - 1])) * 100}%`,
+              transform: 'translateY(-50%)',
+            }}
+          >
+            {formatPrice(currentPrice)}
+          </div>
+          <div className="h-6 absolute bottom-0 left-0 right-0 flex items-center justify-center text-[9px] text-gray-500 border-t border-white/10">
+            Price
+          </div>
+        </div>
+
+        {/* Grid area - tap boxes */}
+        <div className="flex-1 flex flex-col min-w-0">
           <div
-            ref={gridRef}
             className="flex-1 relative"
             style={{
               display: 'grid',
@@ -381,12 +403,6 @@ export const TapChartGrid = memo(function TapChartGrid({
               gap: '1px',
             }}
           >
-            {/* Canvas for price line */}
-            <canvas
-              ref={canvasRef}
-              className="absolute inset-0 pointer-events-none z-10"
-            />
-
             {/* Grid boxes */}
             {gridBoxes.map((box) => {
               const bet = activeBets.find(b =>
@@ -396,7 +412,8 @@ export const TapChartGrid = memo(function TapChartGrid({
               const isActive = bet?.status === 'active';
               const isLong = box.direction === 'long';
               const popState = bet ? poppedBoxes.get(bet.id) : undefined;
-              const isFarFromPrice = Math.abs(box.price - currentPrice) / currentPrice > 0.01;
+              const rowsFromCenter = Math.abs(box.row - NUM_ROWS / 2);
+              const isFarFromPrice = rowsFromCenter > NUM_ROWS / 3;
 
               let timeRemaining = 0;
               if (isActive && bet) {
@@ -407,18 +424,18 @@ export const TapChartGrid = memo(function TapChartGrid({
                 <motion.button
                   key={box.id}
                   className={`
-                    relative flex flex-col items-center justify-center text-[8px]
+                    relative flex flex-col items-center justify-center text-[9px]
                     border transition-all duration-100
-                    ${!bet && isLong && 'border-green-500/20 bg-green-500/5 hover:bg-green-500/20 hover:border-green-500/40'}
-                    ${!bet && !isLong && 'border-red-500/20 bg-red-500/5 hover:bg-red-500/20 hover:border-red-500/40'}
-                    ${isActive && !popState && 'bg-yellow-400 border-yellow-400'}
-                    ${popState === 'win' && 'bg-green-500 border-green-500'}
-                    ${popState === 'lose' && 'bg-red-500 border-red-500'}
+                    ${!bet && isLong && 'border-green-500/30 bg-green-500/10 hover:bg-green-500/30 hover:border-green-500/50'}
+                    ${!bet && !isLong && 'border-red-500/30 bg-red-500/10 hover:bg-red-500/30 hover:border-red-500/50'}
+                    ${isActive && !popState && 'bg-yellow-400 border-yellow-400 animate-pulse'}
+                    ${popState === 'win' && 'bg-green-500 border-green-500 scale-110'}
+                    ${popState === 'lose' && 'bg-red-500 border-red-500 scale-90'}
                   `}
                   style={{
                     gridRow: box.row + 1,
                     gridColumn: box.col + 1,
-                    opacity: isFarFromPrice && !isActive ? 0.6 : 1,
+                    opacity: isFarFromPrice && !isActive ? 0.5 : 1,
                   }}
                   whileTap={!bet ? { scale: 0.9, backgroundColor: isLong ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)' } : undefined}
                   onClick={() => !bet && onTap(box)}
@@ -426,15 +443,15 @@ export const TapChartGrid = memo(function TapChartGrid({
                 >
                   <span className={`font-bold ${
                     isActive || popState ? 'text-black' :
-                    isLong ? 'text-green-400/80' : 'text-red-400/80'
+                    isLong ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {box.multiplier.toFixed(1)}x
                   </span>
                   {isActive && bet && !popState && (
-                    <span className="text-[7px] text-black font-bold">{timeRemaining}s</span>
+                    <span className="text-[8px] text-black font-bold">{timeRemaining}s</span>
                   )}
-                  {popState === 'win' && <span className="text-[10px]">💰</span>}
-                  {popState === 'lose' && <span className="text-[10px]">💥</span>}
+                  {popState === 'win' && <span className="text-sm">💰</span>}
+                  {popState === 'lose' && <span className="text-sm">💥</span>}
                 </motion.button>
               );
             })}
