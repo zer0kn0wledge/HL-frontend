@@ -97,8 +97,8 @@ export function useTapTrading() {
   const [lastWin, setLastWin] = useState<TapBet | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  // Demo mode - starts ON by default for easy testing
-  const [isDemoMode, setIsDemoMode] = useState(true);
+  // Demo mode - starts OFF by default (REAL mode is default)
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoBalance, setDemoBalance] = useState(DEMO_STARTING_BALANCE);
 
   // Tap trading balance for real mode (pre-approved funds)

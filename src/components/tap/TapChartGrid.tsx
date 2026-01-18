@@ -11,19 +11,20 @@ interface TapChartGridProps {
   onTap: (box: GridBox) => void;
 }
 
-// Much finer increments for smooth movement through rows
+// VERY small increments so price visibly moves through MANY rows
+// BTC volatility is ~$10-50 per minute, so $0.50 per row = 20-100 rows of movement!
 const PRICE_INCREMENTS: Record<string, number> = {
-  BTC: 10,      // $10 per row - BTC moves $50-200 typically
-  ETH: 1,       // $1 per row
-  SOL: 0.05,    // $0.05 per row
-  DEFAULT: 0.01,
+  BTC: 0.5,     // $0.50 per row - makes line move dramatically
+  ETH: 0.05,    // $0.05 per row
+  SOL: 0.002,   // $0.002 per row
+  DEFAULT: 0.001,
 };
 
-const NUM_ROWS = 20;        // More rows for smoother scrolling
-const NUM_COLS = 8;         // Fewer columns, more focused
+const NUM_ROWS = 30;        // Many rows for dramatic movement
+const NUM_COLS = 6;         // Fewer columns
 const COL_SECONDS = 5;      // 5 seconds per column
-const HISTORY_SECONDS = 15; // Show 15 seconds of history
-const FUTURE_SECONDS = 25;  // Show 25 seconds into future
+const HISTORY_SECONDS = 10; // Show 10 seconds of history
+const FUTURE_SECONDS = 20;  // Show 20 seconds into future
 
 export const TapChartGrid = memo(function TapChartGrid({
   currentPrice,
@@ -132,10 +133,19 @@ export const TapChartGrid = memo(function TapChartGrid({
     dimsRef.current = { chartW, chartH, colW, rowH, topPrice: 0, nowX, pxPerSecond };
 
     const getMultiplier = (priceDist: number, timeSec: number) => {
-      // Higher multiplier for further price/time
-      const priceFactor = 1 + Math.pow(priceDist * 0.12, 1.3);
-      const timeFactor = 1 + (timeSec / FUTURE_SECONDS) * 0.5;
-      return Math.max(1.05, Math.min(15, priceFactor * timeFactor));
+      // Higher multiplier for further price distance and shorter time
+      // priceDist is in number of rows from current price
+      // With $0.50 increments, 10 rows = $5 move needed
+
+      // Base multiplier increases exponentially with distance
+      // 1 row = 1.1x, 5 rows = 1.5x, 10 rows = 2.5x, 20 rows = 5x+
+      const priceFactor = 1 + Math.pow(priceDist * 0.08, 1.5);
+
+      // Time factor: shorter time = higher multiplier (harder to hit)
+      // Longer time = lower multiplier (easier to wait for target)
+      const timeFactor = Math.max(0.8, 1.5 - (timeSec / FUTURE_SECONDS) * 0.7);
+
+      return Math.max(1.1, Math.min(25, priceFactor * timeFactor));
     };
 
     const draw = () => {

@@ -37,14 +37,20 @@ export function TapTradingView() {
     depositTapBalance,
   } = useTapTrading();
 
-  const [showDepositModal, setShowDepositModal] = useState(false);
+  // Show deposit modal on first load if in real mode with no balance
+  const [showDepositModal, setShowDepositModal] = useState(() => {
+    // Check if we should show on mount (real mode with no balance)
+    return true; // Will be controlled by useEffect
+  });
+  const [hasShownInitialModal, setHasShownInitialModal] = useState(false);
 
-  // Show deposit modal when switching to real mode with no balance
+  // Show deposit modal on first load or when switching to real mode with no balance
   useEffect(() => {
-    if (!isDemoMode && tapTradingBalance === 0) {
+    if (!isDemoMode && tapTradingBalance === 0 && !hasShownInitialModal) {
       setShowDepositModal(true);
+      setHasShownInitialModal(true);
     }
-  }, [isDemoMode, tapTradingBalance]);
+  }, [isDemoMode, tapTradingBalance, hasShownInitialModal]);
 
   const handleTap = (box: GridBox) => {
     // If in real mode with no balance, show deposit modal
