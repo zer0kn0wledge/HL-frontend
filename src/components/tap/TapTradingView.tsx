@@ -23,6 +23,11 @@ export function TapTradingView() {
     setBetAmount,
     setAsset,
     clearLastWin,
+    // Demo mode
+    isDemoMode,
+    demoBalance,
+    toggleDemoMode,
+    resetDemoBalance,
   } = useTapTrading();
 
   const handleTap = (box: GridBox) => {
@@ -43,6 +48,29 @@ export function TapTradingView() {
         />
       </div>
 
+      {/* Demo mode toggle - floating top right */}
+      <div className="absolute top-16 right-4 z-30 flex items-center gap-2">
+        <button
+          onClick={toggleDemoMode}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            isDemoMode
+              ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
+              : 'bg-green-500/20 text-green-400 border border-green-500/50'
+          }`}
+        >
+          {isDemoMode ? '🎮 DEMO' : '💰 REAL'}
+        </button>
+        {isDemoMode && (
+          <button
+            onClick={resetDemoBalance}
+            className="px-2 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 bg-white/5 hover:bg-white/10 transition-all"
+            title="Reset demo balance to $1000"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
       {/* Main chart + grid area */}
       <div className="flex-1 relative">
         <TapChartGrid
@@ -61,6 +89,7 @@ export function TapTradingView() {
         sessionPnL={sessionPnL}
         activeBetsCount={activeBets.length}
         onBetAmountChange={setBetAmount}
+        isDemoMode={isDemoMode}
       />
 
       {/* Win celebration overlay */}
